@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6 flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-900">Order Details</h1>
+        <a href="{{ url_for('order_list') }}" class="text-indigo-600 hover:text-indigo-800 flex items-center font-medium">
+            <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i> Back to Orders
+        </a>
+    </div>
+
+    <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex flex-col sm:flex-row sm:space-x-6 text-sm">
+                <div>
+                    <span class="text-gray-500 block text-xs uppercase tracking-wider">Order Placed</span>
+                    <span class="font-medium text-gray-900">{{ order.created_at }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500 block text-xs uppercase tracking-wider">Total Amount</span>
+                    <span class="font-medium text-gray-900">${{ order.total_amount }}</span>
+                </div>
+                <div>
+                    <span class="text-gray-500 block text-xs uppercase tracking-wider">Order ID</span>
+                    <span class="font-medium text-gray-900">{{ order.id }}</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="px-3 py-1 text-xs font-bold rounded-full 
+                    {% if order.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                    {% elif order.status == 'Shipped' %}bg-blue-100 text-blue-800
+                    {% elif order.status == 'Cancelled' %}bg-red-100 text-red-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ order.status }}
+                </span>
+                
+                {% if order.status == 'Pending' %}
+                <form action="{{ url_for('cancel_order', oid=order.id) }}" method="POST" onsubmit="showConfirm(event, 'Are you sure you want to cancel this entire order?', 'Cancel Order');">
+                    <button type="submit" class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center border border-red-200 bg-red-50 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors">
+                        <i data-lucide="x-circle" class="h-4 w-4 mr-1"></i> Cancel Order
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Sub-Orders (By Vendor)</h2>
+            
+            <div class="space-y-8">
+                {% for sub in sub_orders %}
+                {% if sub.items %}
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+                        <div class="flex items-center">
+                            <i data-lucide="store" class="h-5 w-5 text-gray-400 mr-2"></i>
+                            <span class="font-bold text-gray-900">{{ get_vendor_name(sub.vendor_id) }}</span>
+                            <span class="ml-4 text-sm text-gray-500">Sub-Order: {{ sub.id }}</span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
+                                {{ sub.payment_status }}
+                            </span>
+                            <span class="px-2 py-1 text-xs font-medium rounded 
+                                {% if sub.logistics_status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% elif sub.logistics_status == 'Shipped' %}bg-blue-100 text-blue-800
+                                {% elif sub.logistics_status == 'Cancelled' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                Logistics: {{ sub.logistics_status }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <ul class="divide-y divide-gray-100 p-4">
+                        {% for item in sub.items %}
+                        {% set p = get_product(item.product_id) %}
+                        {% if p %}
+                        <li class="py-4 flex justify-between items-center">
+                            <div class="flex items-center space-x-4">
+                                <img src="{{ p.image }}" class="w-16 h-16 rounded object-cover border border-gray-200" referrerpolicy="no-referrer">
+                                <div>
+                                    <h4 class="text-sm font-medium text-gray-900">{{ p.title }}</h4>
+                                    <p class="text-sm text-gray-500">Qty: {{ item.quantity }} × ${{ item.price }}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-sm font-bold text-gray-900">${{ item.quantity * item.price }}</span>
+                                
+                                {% if order.status == 'Pending' and sub.logistics_status == 'Pending' %}
+                                <form action="{{ url_for('remove_order_item', oid=order.id, sub_id=sub.id, pid=p.id) }}" method="POST" onsubmit="showConfirm(event, 'Remove this item from the order?', 'Remove Item');">
+                                    <button type="submit" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Remove Item">
+                                        <i data-lucide="trash-2" class="h-4 w-4"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </li>
+                        {% endif %}
+                        {% endfor %}
+                    </ul>
+                    <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 text-right">
+                        <span class="text-sm text-gray-500">Sub-Order Total:</span>
+                        <span class="text-lg font-bold text-gray-900 ml-2">${{ sub.amount }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Confirm Modal -->
+<div id="confirm-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600"></i>
+            </div>
+            <h3 class="text-lg leading-6 font-medium text-gray-900 mt-4" id="confirm-title">Confirm Action</h3>
+            <div class="mt-2 px-7 py-3">
+                <p class="text-sm text-gray-500" id="confirm-message">Are you sure?</p>
+            </div>
+            <div class="items-center px-4 py-3 mt-4 flex justify-center space-x-4">
+                <button id="confirm-cancel" class="px-4 py-2 bg-white text-gray-700 text-base font-medium rounded-md border border-gray-300 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    Cancel
+                </button>
+                <button id="confirm-ok" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let formToSubmit = null;
+    
+    function showConfirm(event, message, title="Confirm Action") {
+        event.preventDefault();
+        formToSubmit = event.target;
+        document.getElementById('confirm-message').innerText = message;
+        document.getElementById('confirm-title').innerText = title;
+        document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+    
+    document.getElementById('confirm-cancel').addEventListener('click', () => {
+        document.getElementById('confirm-modal').classList.add('hidden');
+        formToSubmit = null;
+    });
+    
+    document.getElementById('confirm-ok').addEventListener('click', () => {
+        if (formToSubmit) {
+            formToSubmit.submit();
+        }
+    });
+</script>
+{% endblock %}

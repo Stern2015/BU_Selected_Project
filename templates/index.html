@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col md:flex-row gap-8">
+        <!-- Sidebar Filters -->
+        <div class="w-full md:w-64 flex-shrink-0">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6">
+                <h3 class="font-bold text-gray-900 mb-4">Categories</h3>
+                <ul class="space-y-2">
+                    <li>
+                        <a href="{{ url_for('index', q=request.args.get('q', ''), vendor_id=request.args.get('vendor_id', '')) }}" class="text-sm {% if not request.args.get('category') %}text-indigo-600 font-medium{% else %}text-gray-600 hover:text-indigo-600{% endif %}">
+                            All Categories
+                        </a>
+                    </li>
+                    {% for cat in categories %}
+                    <li>
+                        <a href="{{ url_for('index', category=cat, q=request.args.get('q', ''), vendor_id=request.args.get('vendor_id', '')) }}" class="text-sm {% if request.args.get('category') == cat %}text-indigo-600 font-medium{% else %}text-gray-600 hover:text-indigo-600{% endif %}">
+                            {{ cat }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h3 class="font-bold text-gray-900 mb-4">Vendors</h3>
+                <ul class="space-y-2">
+                    <li>
+                        <a href="{{ url_for('index', q=request.args.get('q', ''), category=request.args.get('category', '')) }}" class="text-sm {% if not request.args.get('vendor_id') %}text-indigo-600 font-medium{% else %}text-gray-600 hover:text-indigo-600{% endif %}">
+                            All Vendors
+                        </a>
+                    </li>
+                    {% for v in vendors %}
+                    {% if v.status == 'Active' %}
+                    <li>
+                        <a href="{{ url_for('index', vendor_id=v.id, q=request.args.get('q', ''), category=request.args.get('category', '')) }}" class="text-sm {% if request.args.get('vendor_id') == v.id %}text-indigo-600 font-medium{% else %}text-gray-600 hover:text-indigo-600{% endif %}">
+                            {{ v.name }}
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1">
+            <div class="mb-8">
+                <form action="{{ url_for('index') }}" method="GET" class="flex">
+                    <input type="hidden" name="category" value="{{ request.args.get('category', '') }}">
+                    <input type="hidden" name="vendor_id" value="{{ request.args.get('vendor_id', '') }}">
+                    <div class="relative flex-1 max-w-2xl">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="search" class="h-5 w-5 text-gray-400"></i>
+                        </div>
+                        <input type="text" name="q" value="{{ request.args.get('q', '') }}" class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Search products by title or tags...">
+                    </div>
+                    <button type="submit" class="ml-4 px-6 py-3 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Search</button>
+                </form>
+            </div>
+
+            {% if products %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for product in products %}
+                <div class="bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow rounded-xl border border-gray-100 flex flex-col">
+                    <a href="{{ url_for('product_detail', pid=product.id) }}" class="block">
+                        <img src="{{ product.image }}" alt="{{ product.title }}" class="w-full h-48 object-cover" referrerpolicy="no-referrer">
+                    </a>
+                    <div class="p-5 flex-1 flex flex-col">
+                        <a href="{{ url_for('product_detail', pid=product.id) }}" class="block">
+                            <h3 class="text-lg font-bold text-gray-900 line-clamp-1 hover:text-indigo-600">{{ product.title }}</h3>
+                        </a>
+                        <p class="text-sm text-gray-500 mt-1">Vendor: {{ get_vendor_name(product.vendor_id) }}</p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ product.category }}</span>
+                            {% for tag in product.tags %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="mt-auto pt-4 flex items-center justify-between">
+                            <span class="text-2xl font-black text-gray-900">${{ product.price }}</span>
+                            {% if session.get('login_type') != 'backend' %}
+                                {% if product.stock > 0 %}
+                                <form action="{{ url_for('add_to_cart', pid=product.id) }}" method="POST">
+                                    <button type="submit" class="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100" title="Add to Cart">
+                                        <i data-lucide="shopping-bag" class="h-5 w-5"></i>
+                                    </button>
+                                </form>
+                                {% else %}
+                                <button disabled class="p-2 bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed" title="Out of Stock">
+                                    <i data-lucide="shopping-bag" class="h-5 w-5"></i>
+                                </button>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-12 bg-white rounded-xl border border-gray-200">
+                <i data-lucide="package-x" class="h-12 w-12 text-gray-400 mx-auto mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900">No products found</h3>
+                <p class="text-gray-500 mt-1">Try adjusting your search or filters.</p>
+                <a href="{{ url_for('index') }}" class="mt-4 inline-block text-indigo-600 hover:text-indigo-800">Clear all filters</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

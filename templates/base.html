@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BU Selected</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <nav class="bg-indigo-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i data-lucide="shopping-cart" class="h-8 w-8 mr-2"></i>
+                    {% if session.get('login_type') == 'backend' %}
+                        <a href="{% if has_role(session['user'], ROLE_ADMIN) %}{{ url_for('admin_dashboard') }}{% else %}{{ url_for('vendor_dashboard') }}{% endif %}" class="font-bold text-xl">BU Selected Backend</a>
+                    {% else %}
+                        <a href="{{ url_for('index') }}" class="font-bold text-xl">BU Selected</a>
+                    {% endif %}
+                </div>
+                <div class="flex items-center space-x-4">
+                    {% if session.get('user') %}
+                        <div class="flex items-center bg-indigo-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                            <i data-lucide="user" class="h-4 w-4 mr-2 text-indigo-200"></i>
+                            <span class="mr-2">{{ session['user']['username'] }}</span>
+                            <span class="bg-indigo-500 text-xs px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                {% if session.get('login_type') == 'backend' %}
+                                    {% if has_role(session['user'], ROLE_ADMIN) %}ADMIN{% elif has_role(session['user'], ROLE_VENDOR) %}VENDOR{% endif %}
+                                {% else %}
+                                    CUSTOMER
+                                {% endif %}
+                            </span>
+                        </div>
+                        
+                        {% if session.get('login_type') == 'customer' %}
+                            <a href="{{ url_for('view_cart') }}" class="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-indigo-500 text-indigo-100 hover:text-white" title="Cart">
+                                <i data-lucide="shopping-cart" class="h-5 w-5 sm:mr-1"></i>
+                                <span class="hidden sm:inline">Cart</span>
+                            </a>
+                            <a href="{{ url_for('order_list') }}" class="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-indigo-500 text-indigo-100 hover:text-white" title="My Orders">
+                                <i data-lucide="clipboard-list" class="h-5 w-5 sm:mr-1"></i>
+                                <span class="hidden sm:inline">Orders</span>
+                            </a>
+                        {% elif session.get('login_type') == 'backend' %}
+                            {% if has_role(session['user'], ROLE_VENDOR) %}
+                                <a href="{{ url_for('vendor_dashboard') }}" class="hover:text-indigo-200 transition-colors font-medium text-sm ml-4">Dashboard</a>
+                            {% endif %}
+                            {% if has_role(session['user'], ROLE_ADMIN) %}
+                                <a href="{{ url_for('admin_dashboard') }}" class="hover:text-indigo-200 transition-colors font-medium text-sm ml-4">Admin Console</a>
+                            {% endif %}
+                        {% endif %}
+
+                        <a href="{{ url_for('logout') }}" class="px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors hover:bg-indigo-500 text-indigo-100 hover:text-white" title="Logout">
+                            <i data-lucide="log-out" class="h-5 w-5 sm:mr-1"></i>
+                            <span class="hidden sm:inline">Logout</span>
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('login', type='customer') }}" class="px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors hover:bg-indigo-500">
+                            <i data-lucide="user" class="h-4 w-4 mr-1"></i> Customer Login
+                        </a>
+                        <div class="w-px h-6 bg-indigo-400 mx-2"></div>
+                        <a href="{{ url_for('login', type='backend') }}" class="px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors hover:bg-indigo-500">
+                            <i data-lucide="shield" class="h-4 w-4 mr-1"></i> Backend Login
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div class="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-3 rounded relative" role="alert">
+                <span class="block sm:inline">{{ messages[0] }}</span>
+            </div>
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

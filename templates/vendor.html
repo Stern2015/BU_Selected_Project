@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Vendor Dashboard</h1>
+            <p class="text-gray-500 mt-1">Current Store: <span class="font-medium text-indigo-600">{{ get_vendor_name(session['user']['id']) }}</span></p>
+        </div>
+        <div class="text-right">
+            <div class="text-sm text-gray-500">Total Products</div>
+            <div class="text-2xl font-bold text-indigo-600">{{ products|length }}</div>
+        </div>
+    </div>
+
+    <div class="flex space-x-6 mb-6 border-b border-gray-200 pb-2">
+        <a href="{{ url_for('vendor_dashboard', tab='products') }}" class="text-lg font-medium pb-2 {% if tab == 'products' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">Products Management</a>
+        <a href="{{ url_for('vendor_dashboard', tab='transactions') }}" class="text-lg font-medium pb-2 {% if tab == 'transactions' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">Transactions & Orders</a>
+    </div>
+
+    {% if tab == 'products' %}
+    <div class="mb-6 flex justify-between items-center">
+        <div class="text-sm text-gray-500">Manage your store's inventory</div>
+        <button onclick="openAddProductModal()" class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-sm font-medium">
+            <i data-lucide="plus" class="h-4 w-4 mr-2"></i> Add New Product
+        </button>
+    </div>
+    <div class="bg-white shadow-sm overflow-hidden sm:rounded-xl border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tags</th>
+                    <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for product in products %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <img src="{{ product.image }}" class="h-10 w-10 rounded-md object-cover border border-gray-200" referrerpolicy="no-referrer">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">
+                                    <a href="{{ url_for('product_detail', pid=product.id) }}" class="hover:text-indigo-600" target="_blank">{{ product.title }}</a>
+                                </div>
+                                <div class="text-xs text-gray-500">ID: {{ product.id }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${{ product.price }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span class="{% if product.stock == 0 %}text-red-500 font-bold{% endif %}">{{ product.stock }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {% if product.status == 'Active' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ product.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div class="flex gap-1 flex-wrap w-48">
+                            {% for tag in product.tags %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700">
+                                {{ tag }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editProduct('{{ product.id }}', '{{ product.title }}', {{ product.price }}, {{ product.stock }}, '{{ product.image }}', '{{ product.tags|join(', ') }}')" class="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit">
+                            <i data-lucide="edit" class="h-5 w-5 inline"></i>
+                        </button>
+                        <form action="{{ url_for('toggle_product', pid=product.id) }}" method="POST" class="inline">
+                            <button type="submit" class="{% if product.status == 'Active' %}text-red-600 hover:text-red-900{% else %}text-green-600 hover:text-green-900{% endif %}" title="Toggle Status">
+                                {% if product.status == 'Active' %}
+                                <i data-lucide="eye-off" class="h-5 w-5 inline"></i>
+                                {% else %}
+                                <i data-lucide="eye" class="h-5 w-5 inline"></i>
+                                {% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Product Modal -->
+    <div id="product-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">Add/Edit Product</h3>
+                <form action="{{ url_for('save_product') }}" method="POST">
+                    <input type="hidden" name="id" id="product-id">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Title</label>
+                            <input type="text" name="title" id="product-title" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div class="flex space-x-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700">Price ($)</label>
+                                <input type="number" step="0.01" name="price" id="product-price" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700">Stock</label>
+                                <input type="number" name="stock" id="product-stock" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Image URL</label>
+                            <input type="url" name="image" id="product-image" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tags (comma separated)</label>
+                            <input type="text" name="tags" id="product-tags" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button type="button" onclick="document.getElementById('product-modal').classList.add('hidden')" class="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function openAddProductModal() {
+            document.getElementById('product-id').value = '';
+            document.getElementById('product-title').value = '';
+            document.getElementById('product-price').value = '';
+            document.getElementById('product-stock').value = '';
+            document.getElementById('product-image').value = '';
+            document.getElementById('product-tags').value = '';
+            document.getElementById('modal-title').innerText = 'Add New Product';
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        function editProduct(id, title, price, stock, image, tags) {
+            document.getElementById('product-id').value = id;
+            document.getElementById('product-title').value = title;
+            document.getElementById('product-price').value = price;
+            document.getElementById('product-stock').value = stock;
+            document.getElementById('product-image').value = image;
+            document.getElementById('product-tags').value = tags;
+            document.getElementById('modal-title').innerText = 'Edit Product';
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+    </script>
+
+    {% elif tab == 'transactions' %}
+    <div class="bg-white shadow-sm overflow-hidden sm:rounded-xl border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Parent Order</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Items</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Logistics</th>
+                    <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for sub in sub_orders %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ sub.id }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sub.order_id }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        <ul class="list-disc pl-4">
+                            {% for item in sub.items %}
+                            {% set p = get_product(item.product_id) %}
+                            {% if p %}
+                            <li>{{ p.title }} (x{{ item.quantity }})</li>
+                            {% endif %}
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">${{ sub.amount }}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            {% if sub.logistics_status == 'Pending' %}bg-yellow-100 text-yellow-800
+                            {% elif sub.logistics_status == 'Shipped' %}bg-blue-100 text-blue-800
+                            {% elif sub.logistics_status == 'Cancelled' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ sub.logistics_status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        {% if sub.logistics_status == 'Pending' %}
+                        <form action="{{ url_for('ship_order', sub_id=sub.id) }}" method="POST">
+                            <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                <i data-lucide="truck" class="h-4 w-4 mr-1"></i> Ship
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-gray-400 text-xs">No actions</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

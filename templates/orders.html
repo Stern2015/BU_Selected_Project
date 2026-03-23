@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+
+    {% if orders %}
+    <div class="space-y-6">
+        {% for order in orders %}
+        <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div class="flex flex-col sm:flex-row sm:space-x-6 text-sm">
+                    <div>
+                        <span class="text-gray-500 block text-xs uppercase tracking-wider">Order Placed</span>
+                        <span class="font-medium text-gray-900">{{ order.created_at }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block text-xs uppercase tracking-wider">Total Amount</span>
+                        <span class="font-medium text-gray-900">${{ order.total_amount }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 block text-xs uppercase tracking-wider">Order ID</span>
+                        <span class="font-medium text-gray-900">{{ order.id }}</span>
+                    </div>
+                </div>
+                <div>
+                    <span class="px-3 py-1 text-xs font-bold rounded-full 
+                        {% if order.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                        {% elif order.status == 'Shipped' %}bg-blue-100 text-blue-800
+                        {% elif order.status == 'Cancelled' %}bg-red-100 text-red-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ order.status }}
+                    </span>
+                </div>
+            </div>
+            <div class="p-6 flex justify-between items-center">
+                <div class="text-gray-600 text-sm">
+                    Click to view order details, sub-orders, and logistics information.
+                </div>
+                <a href="{{ url_for('order_detail', oid=order.id) }}" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    View Details
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div class="mx-auto flex items-center justify-center h-24 w-24 rounded-full bg-gray-50 mb-4">
+            <i data-lucide="package" class="h-12 w-12 text-gray-400"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">No orders yet</h2>
+        <p class="text-gray-500 mb-8">You haven't placed any orders.</p>
+        <a href="{{ url_for('index') }}" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+            Start Shopping
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
