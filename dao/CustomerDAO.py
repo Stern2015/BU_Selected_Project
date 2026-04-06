@@ -10,11 +10,39 @@ class CustomerDAO(BaseDAO):
 
     # Customer profile
     def get_customer_profile(self, customer_id):
-        pass
+        sql = """
+            SELECT ua.User_ID,ua.Username,ua.Phone_number,ua.Role,c.Nick_name,c.Address
+            FROM Customer c,UserAccount ua
+            WHERE c.User_ID = ua.User_ID AND c.User_ID = %s;
+        """
+        params = (customer_id,)
+        return self.executor.execute_query_one(sql, params)
 
+    def update_customer_profile(self, customer_id, nickname=None, address=None, phone_number=None):
+        pass
     # Product browsing
     def get_all_products(self, keyword=None, vendor_id=None, tag_id=None):
-        pass
+        sql = """
+            SELECT DISTINCT p.*
+            FROM Product p
+            LEFT JOIN Tagging tg ON p.Product_ID = tg.Product_ID
+            WHERE 1=1
+        """
+        params = []
+
+        if keyword:
+            sql += " AND p.Name LIKE %s"
+            params.append(f"%{keyword}%")
+
+        if vendor_id is not None:
+            sql += " AND p.Vendor_ID = %s"
+            params.append(vendor_id)
+
+        if tag_id is not None:
+            sql += " AND tg.Tag_ID = %s"
+            params.append(tag_id)
+
+        return self.executor.execute_query(sql, tuple(params))
 
     def get_product_by_id(self, product_id):
         pass
