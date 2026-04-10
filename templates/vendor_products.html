@@ -1,0 +1,628 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page title -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Product Management</h1>
+            <p class="text-gray-500 mt-1">Manage your store's inventory and products</p>
+        </div>
+        <div class="text-right">
+            <div class="text-sm text-gray-500">Total Products</div>
+            <div class="text-2xl font-bold text-indigo-600">{{ total_products }}</div>
+        </div>
+    </div>
+
+    <!-- 标签切换 -->
+    <div class="flex space-x-6 mb-6 border-b border-gray-200 pb-2">
+        <a href="{{ url_for('vendor_products') }}"
+           class="text-lg font-medium pb-2 {% if tab == 'all' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+            All Products
+        </a>
+        <a href="{{ url_for('vendor_products', tab='active') }}"
+           class="text-lg font-medium pb-2 {% if tab == 'active' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+            Active
+        </a>
+        <a href="{{ url_for('vendor_products', tab='inactive') }}"
+           class="text-lg font-medium pb-2 {% if tab == 'inactive' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+            Inactive
+        </a>
+        <a href="{{ url_for('vendor_products', tab='inventory') }}"
+           class="text-lg font-medium pb-2 {% if tab == 'inventory' %}text-indigo-600 border-b-2 border-indigo-600{% else %}text-gray-500 hover:text-gray-700{% endif %}">
+            Inventory
+        </a>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+        <!-- 搜索和过滤 -->
+        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+            <div class="relative">
+                <input type="text" id="search-input" placeholder="Search products..."
+                       class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-64">
+                <i data-lucide="search" class="h-4 w-4 absolute left-3 top-3 text-gray-400"></i>
+            </div>
+            <select id="category-filter" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex space-x-3">
+            {% if tab == 'inventory' %}
+            <button onclick="openBulkStockModal()"
+                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center">
+                <i data-lucide="package-plus" class="h-4 w-4 mr-2"></i>
+                Bulk Update
+            </button>
+            {% endif %}
+            <button onclick="openAddProductModal()"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium flex items-center">
+                <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                Add Product
+            </button>
+        </div>
+    </div>
+
+    <!-- 批量操作栏（仅库存标签显示） -->
+    {% if tab == 'inventory' and products %}
+    <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <i data-lucide="info" class="h-5 w-5 text-blue-600 mr-2"></i>
+                <span class="text-sm text-blue-700">Select products to update stock in bulk</span>
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="selectAllProducts()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                    Select All
+                </button>
+                <button onclick="deselectAllProducts()" class="text-sm text-gray-600 hover:text-gray-800 font-medium ml-2">
+                    Deselect All
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 产品表格 -->
+    <div class="bg-white shadow-sm overflow-hidden sm:rounded-xl border border-gray-200">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    {% if tab == 'inventory' %}
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-12">
+                        <input type="checkbox" id="select-all" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </th>
+                    {% endif %}
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tags</th>
+                    <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200" id="products-table-body">
+                {% for product in products %}
+                <tr class="hover:bg-gray-50 product-row" data-id="{{ product.id }}" data-name="{{ product.name }}" data-category="{{ product.category }}">
+                    {% if tab == 'inventory' %}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox" name="selected_products" value="{{ product.id }}"
+                               class="product-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </td>
+                    {% endif %}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <img src="{{ product.image_url or 'https://picsum.photos/seed/product/100/100' }}"
+                                 class="h-10 w-10 rounded-md object-cover border border-gray-200"
+                                 onerror="this.src='https://picsum.photos/seed/product/100/100'">
+                            <div class="ml-4">
+                                <div class="text-sm font-medium text-gray-900">
+                                    <a href="{{ url_for('product_detail', pid=product.id) }}" class="hover:text-indigo-600" target="_blank">
+                                        {{ product.name }}
+                                    </a>
+                                </div>
+                                <div class="text-xs text-gray-500">ID: {{ product.id }}</div>
+                                <div class="text-xs text-indigo-600">{{ product.category }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        ${{ "%.2f"|format(product.price) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% if tab == 'inventory' %}
+                        <div class="flex items-center space-x-2">
+                            <button onclick="decreaseStock('{{ product.id }}', '{{ product.name }}')"
+                                    class="p-1 rounded border border-gray-300 hover:bg-gray-100 text-gray-600">
+                                <i data-lucide="minus" class="h-3 w-3"></i>
+                            </button>
+                            <span class="text-sm font-medium min-w-12 text-center {% if product.stock == 0 %}text-red-500{% endif %}">
+                                {{ product.stock }}
+                            </span>
+                            <button onclick="increaseStock('{{ product.id }}', '{{ product.name }}')"
+                                    class="p-1 rounded border border-gray-300 hover:bg-gray-100 text-gray-600">
+                                <i data-lucide="plus" class="h-3 w-3"></i>
+                            </button>
+                        </div>
+                        {% else %}
+                        <span class="text-sm {% if product.stock == 0 %}text-red-500 font-bold{% endif %}">
+                            {{ product.stock }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                                  {% if product.status == 'Active' %}bg-green-100 text-green-800
+                                  {% elif product.status == 'OutOfStock' %}bg-yellow-100 text-yellow-800
+                                  {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ product.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex gap-1 flex-wrap max-w-xs">
+                            {% for tag in product.tags %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700">
+                                {{ tag.name }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editProduct('{{ product.id }}')"
+                                class="text-indigo-600 hover:text-indigo-900 mr-4" title="Edit">
+                            <i data-lucide="edit" class="h-5 w-5 inline"></i>
+                        </button>
+                        <form action="{{ url_for('toggle_product_status', product_id=product.id) }}" method="POST" class="inline">
+                            <button type="submit"
+                                    class="{% if product.status == 'Active' or product.status == 'OutOfStock' %}text-red-600 hover:text-red-900{% else %}text-green-600 hover:text-green-900{% endif %}"
+                                    title="Toggle Status">
+                                {% if product.status == 'Active' or product.status == 'OutOfStock' %}
+                                <i data-lucide="eye-off" class="h-5 w-5 inline"></i>
+                                {% else %}
+                                <i data-lucide="eye" class="h-5 w-5 inline"></i>
+                                {% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- 空状态 -->
+        {% if not products %}
+        <div class="text-center py-12">
+            <div class="mx-auto w-16 h-16 text-gray-300 mb-4">
+                <i data-lucide="package" class="w-full h-full"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+            <p class="text-gray-600 mb-4">
+                {% if tab == 'active' %}
+                You don't have any active products. Add your first product to get started.
+                {% elif tab == 'inactive' %}
+                You don't have any inactive products.
+                {% elif tab == 'inventory' %}
+                No products to manage inventory for.
+                {% else %}
+                You haven't added any products yet.
+                {% endif %}
+            </p>
+            {% if tab != 'inactive' %}
+            <button onclick="openAddProductModal()"
+                    class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
+                Add Your First Product
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 分页 -->
+    {% if total_pages > 1 %}
+    <div class="mt-6 flex justify-between items-center">
+        <div class="text-sm text-gray-500">
+            Showing {{ start_item }}-{{ end_item }} of {{ total_products }} products
+        </div>
+        <nav class="flex items-center space-x-2">
+            {% if page > 1 %}
+            <a href="{{ url_for('vendor_products', page=page-1, tab=tab) }}"
+               class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                <i data-lucide="chevron-left" class="h-4 w-4"></i>
+            </a>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <span class="px-3 py-2 bg-indigo-600 text-white rounded-lg font-medium">
+                    {{ p }}
+                </span>
+                {% elif p >= page - 2 and p <= page + 2 %}
+                <a href="{{ url_for('vendor_products', page=p, tab=tab) }}"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    {{ p }}
+                </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('vendor_products', page=page+1, tab=tab) }}"
+               class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 添加/编辑产品模态框 -->
+<div id="product-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Add New Product</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-500">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <form id="product-form" action="{{ url_for('save_product') }}" method="POST">
+                <input type="hidden" name="product_id" id="product-id">
+
+                <div class="space-y-4">
+                    <!-- 基本信息 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Product Name *</label>
+                            <input type="text" name="name" id="product-name" required
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                            <select name="category" id="product-category" required
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="">Select Category</option>
+                                {% for category in categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Price ($) *</label>
+                            <input type="number" name="price" id="product-price" step="0.01" min="0" required
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Stock *</label>
+                            <input type="number" name="stock" id="product-stock" min="0" required
+                                   class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- 描述和图片 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea name="description" id="product-description" rows="3"
+                                  class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  placeholder="Describe your product..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                        <input type="url" name="image_url" id="product-image-url"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               placeholder="https://example.com/image.jpg">
+                        <p class="text-xs text-gray-500 mt-1">Leave empty to use default image</p>
+                    </div>
+
+                    <!-- 标签 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tags (max 3, comma separated)</label>
+                        <input type="text" name="tags" id="product-tags"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               placeholder="electronics, wireless, premium">
+                        <div class="mt-2 flex flex-wrap gap-2" id="tag-suggestions">
+                            {% for tag in popular_tags %}
+                            <button type="button" onclick="addTagToInput('{{ tag.name }}')"
+                                    class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200">
+                                {{ tag.name }}
+                                <i data-lucide="plus" class="h-3 w-3 ml-1"></i>
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- 状态 -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                        <select name="status" id="product-status"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="closeModal()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                        Save Product
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 批量库存更新模态框 -->
+{% if tab == 'inventory' %}
+<div id="bulk-stock-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Bulk Stock Update</h3>
+                <button onclick="closeBulkStockModal()" class="text-gray-400 hover:text-gray-500">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <form id="bulk-stock-form" action="{{ url_for('bulk_update_stock') }}" method="POST">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
+                        <select name="action" id="bulk-action" required
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="increase">Increase Stock</option>
+                            <option value="decrease">Decrease Stock</option>
+                            <option value="set">Set Stock to Specific Value</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" id="bulk-amount-label">Amount</label>
+                        <input type="number" name="amount" id="bulk-amount" min="1" required
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div id="bulk-set-value" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Set Stock To</label>
+                        <input type="number" name="set_value" id="bulk-set-value-input" min="0"
+                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        <span id="selected-count">0</span> products selected
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="closeBulkStockModal()"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                        Update Stock
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// 初始化图标
+lucide.createIcons();
+
+// 产品模态框功能
+function openAddProductModal() {
+    document.getElementById('product-id').value = '';
+    document.getElementById('product-name').value = '';
+    document.getElementById('product-description').value = '';
+    document.getElementById('product-price').value = '';
+    document.getElementById('product-stock').value = '';
+    document.getElementById('product-category').value = '';
+    document.getElementById('product-image-url').value = '';
+    document.getElementById('product-tags').value = '';
+    document.getElementById('product-status').value = 'Active';
+    document.getElementById('modal-title').innerText = 'Add New Product';
+    document.getElementById('product-modal').classList.remove('hidden');
+}
+
+function editProduct(productId) {
+    // 这里应该通过AJAX获取产品数据
+    // 暂时重定向到带参数的URL
+    window.location.href = `{{ url_for('vendor_products') }}?edit=${productId}`;
+}
+
+function closeModal() {
+    document.getElementById('product-modal').classList.add('hidden');
+}
+
+// 标签功能
+function addTagToInput(tagName) {
+    const tagsInput = document.getElementById('product-tags');
+    const currentTags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+
+    if (currentTags.length >= 3) {
+        alert('Maximum 3 tags allowed');
+        return;
+    }
+
+    if (!currentTags.includes(tagName)) {
+        if (tagsInput.value) {
+            tagsInput.value += ', ' + tagName;
+        } else {
+            tagsInput.value = tagName;
+        }
+    }
+}
+
+// 搜索和过滤功能
+document.getElementById('search-input').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    filterProducts(searchTerm);
+});
+
+document.getElementById('category-filter').addEventListener('change', function(e) {
+    filterProductsByCategory(e.target.value);
+});
+
+function filterProducts(searchTerm) {
+    const rows = document.querySelectorAll('.product-row');
+    rows.forEach(row => {
+        const productName = row.getAttribute('data-name').toLowerCase();
+        const shouldShow = productName.includes(searchTerm);
+        row.style.display = shouldShow ? '' : 'none';
+    });
+}
+
+function filterProductsByCategory(category) {
+    const rows = document.querySelectorAll('.product-row');
+    rows.forEach(row => {
+        const productCategory = row.getAttribute('data-category');
+        const shouldShow = !category || productCategory === category;
+        row.style.display = shouldShow ? '' : 'none';
+    });
+}
+
+// 库存管理功能
+function increaseStock(productId, productName) {
+    const amount = prompt(`Increase stock for "${productName}" by:`, '1');
+    if (amount && !isNaN(amount) && parseInt(amount) > 0) {
+        updateStock(productId, 'increase', parseInt(amount));
+    }
+}
+
+function decreaseStock(productId, productName) {
+    const amount = prompt(`Decrease stock for "${productName}" by:`, '1');
+    if (amount && !isNaN(amount) && parseInt(amount) > 0) {
+        updateStock(productId, 'decrease', parseInt(amount));
+    }
+}
+
+function updateStock(productId, action, amount) {
+    // 这里应该通过AJAX更新库存
+    fetch(`/vendor/product/${productId}/stock`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, amount })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.message || 'Failed to update stock');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to update stock');
+    });
+}
+
+// 批量操作功能
+function selectAllProducts() {
+    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+        checkbox.checked = true;
+    });
+    updateSelectedCount();
+}
+
+function deselectAllProducts() {
+    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('.product-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = selected;
+}
+
+document.getElementById('select-all').addEventListener('change', function(e) {
+    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+        checkbox.checked = e.target.checked;
+    });
+    updateSelectedCount();
+});
+
+document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', updateSelectedCount);
+});
+
+// 批量库存模态框
+function openBulkStockModal() {
+    const selectedCount = document.querySelectorAll('.product-checkbox:checked').length;
+    if (selectedCount === 0) {
+        alert('Please select at least one product');
+        return;
+    }
+
+    document.getElementById('selected-count').textContent = selectedCount;
+    document.getElementById('bulk-stock-modal').classList.remove('hidden');
+}
+
+function closeBulkStockModal() {
+    document.getElementById('bulk-stock-modal').classList.add('hidden');
+}
+
+document.getElementById('bulk-action').addEventListener('change', function(e) {
+    const setValueDiv = document.getElementById('bulk-set-value');
+    const amountLabel = document.getElementById('bulk-amount-label');
+
+    if (e.target.value === 'set') {
+        setValueDiv.classList.remove('hidden');
+        amountLabel.textContent = 'Current Stock';
+    } else {
+        setValueDiv.classList.add('hidden');
+        amountLabel.textContent = 'Amount';
+    }
+});
+
+// 表单验证
+document.getElementById('product-form').addEventListener('submit', function(e) {
+    const tagsInput = document.getElementById('product-tags');
+    const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+
+    if (tags.length > 3) {
+        e.preventDefault();
+        alert('Maximum 3 tags allowed');
+        return;
+    }
+
+    // 验证价格和库存
+    const price = parseFloat(document.getElementById('product-price').value);
+    const stock = parseInt(document.getElementById('product-stock').value);
+
+    if (price < 0) {
+        e.preventDefault();
+        alert('Price must be non-negative');
+        return;
+    }
+
+    if (stock < 0) {
+        e.preventDefault();
+        alert('Stock must be non-negative');
+        return;
+    }
+});
+
+// 页面加载时更新选中计数
+document.addEventListener('DOMContentLoaded', function() {
+    updateSelectedCount();
+});
+</script>
+{% endblock %}

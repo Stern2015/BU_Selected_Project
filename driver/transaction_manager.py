@@ -1,6 +1,6 @@
 """
 Transaction Manager
-处理数据库事务管理
+Handles database transaction management
 """
 from db_connection import Connection_Manager
 
@@ -20,7 +20,7 @@ class Transaction_Manager:
             conn.commit()
             return True
         except Exception as e:
-            print(f"transaction failed, rolling back database. Detailed Error:{e}")
+            print(f"Transaction failed, rolling back database. Detailed Error: {e}")
             conn.rollback()
             return False
         finally:

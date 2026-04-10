@@ -1,6 +1,6 @@
 """
 Raw SQL Execution
-处理原生 SQL 的组装与执行 (基于 PyMySQL)
+Handles raw SQL assembly and execution (based on PyMySQL)
 """
 import pymysql
 from db_connection import Connection_Manager

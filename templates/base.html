@@ -34,6 +34,10 @@
                         </div>
                         
                         {% if session.get('login_type') == 'customer' %}
+                            <a href="{{ url_for('products') }}" class="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-indigo-500 text-indigo-100 hover:text-white" title="Browse Products">
+                                <i data-lucide="package" class="h-5 w-5 sm:mr-1"></i>
+                                <span class="hidden sm:inline">Products</span>
+                            </a>
                             <a href="{{ url_for('view_cart') }}" class="flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors hover:bg-indigo-500 text-indigo-100 hover:text-white" title="Cart">
                                 <i data-lucide="shopping-cart" class="h-5 w-5 sm:mr-1"></i>
                                 <span class="hidden sm:inline">Cart</span>
@@ -56,6 +60,9 @@
                             <span class="hidden sm:inline">Logout</span>
                         </a>
                     {% else %}
+                        <a href="{{ url_for('products') }}" class="px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors hover:bg-indigo-500">
+                            <i data-lucide="package" class="h-4 w-4 mr-1"></i> Browse Products
+                        </a>
                         <a href="{{ url_for('login', type='customer') }}" class="px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors hover:bg-indigo-500">
                             <i data-lucide="user" class="h-4 w-4 mr-1"></i> Customer Login
                         </a>

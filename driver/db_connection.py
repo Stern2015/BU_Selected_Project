@@ -1,6 +1,6 @@
 """
 DB Connection Management
-处理数据库连接池与连接获取
+Handles database connection pool and connection acquisition
 """
 
 import pymysql

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
@@ -61,35 +61,125 @@ def inject_globals():
 
 @app.route('/')
 def index():
-    q = request.args.get('q', '').lower()
-    cat = request.args.get('category', '')
-    vid = request.args.get('vendor_id', '')
-    
-    # Get active vendors
-    active_vendor_ids = {v['id'] for v in DB['vendors'] if v['status'] == 'Active'}
-    
-    filtered = []
-    for p in DB['products']:
-        if p['status'] != 'Active': continue
-        if p['vendor_id'] not in active_vendor_ids: continue
-        if q and q not in p['title'].lower() and not any(q in t.lower() for t in p['tags']): continue
-        if cat and p['category'] != cat: continue
-        if vid and p['vendor_id'] != vid: continue
-        filtered.append(p)
-        
-    return render_template('index.html', products=filtered, categories=DB['categories'], vendors=DB['vendors'], request=request)
+    """Home page redirects to product browsing page"""
+    return redirect(url_for('products'))
 
 @app.route('/product/<pid>')
 def product_detail(pid):
     p = get_product(pid)
     if not p: return "Product not found", 404
-    
+
     v = next((v for v in DB['vendors'] if v['id'] == p['vendor_id']), None)
     if not v or v['status'] != 'Active':
         flash('This product is currently unavailable.')
         return redirect(url_for('index'))
-        
+
     return render_template('product.html', product=p)
+
+@app.route('/products')
+def products():
+    """Product browsing page"""
+    # Get query parameters
+    keyword = request.args.get('q', '').strip()
+    category = request.args.get('category', '').strip()
+    min_price = request.args.get('min_price')
+    max_price = request.args.get('max_price')
+    tags = request.args.get('tags', '').strip()
+    page = int(request.args.get('page', 1))
+
+    # Convert price parameters
+    min_price = float(min_price) if min_price and min_price.replace('.', '', 1).isdigit() else None
+    max_price = float(max_price) if max_price and max_price.replace('.', '', 1).isdigit() else None
+
+    # Get product data (currently using in-memory database)
+    filtered_products = []
+    for p in DB['products']:
+        if p['status'] != 'Active':
+            continue
+
+        # Check if vendor is active
+        v = next((v for v in DB['vendors'] if v['id'] == p['vendor_id']), None)
+        if not v or v['status'] != 'Active':
+            continue
+
+        # Keyword filtering
+        if keyword and keyword.lower() not in p['title'].lower():
+            continue
+
+        # Category filtering
+        if category and p['category'] != category:
+            continue
+
+        # Price filtering
+        if min_price is not None and p['price'] < min_price:
+            continue
+        if max_price is not None and p['price'] > max_price:
+            continue
+
+        # Tag filtering
+        if tags:
+            tag_list = [t.strip().lower() for t in tags.split(',')]
+            product_tags = [t.lower() for t in p.get('tags', [])]
+            if not any(tag in product_tags for tag in tag_list):
+                continue
+
+        # Format product data
+        product_data = {
+            'id': p['id'],
+            'name': p['title'],
+            'description': '',
+            'price': p['price'],
+            'stock': p['stock'],
+            'category': p['category'],
+            'image_url': p['image'],
+            'vendor_id': p['vendor_id'],
+            'status': p['status'],
+            'rating': p.get('rating', 0.0),
+            'store_name': get_vendor_name(p['vendor_id']),
+            'tags': [{'name': tag} for tag in p.get('tags', [])]
+        }
+
+        # Add status classes
+        if product_data['stock'] == 0:
+            product_data['status_class'] = 'bg-yellow-100 text-yellow-800'
+            product_data['status_label'] = 'Out of Stock'
+        else:
+            product_data['status_class'] = 'bg-green-100 text-green-800'
+            product_data['status_label'] = 'Active'
+
+        product_data['stock_status'] = 'Out of Stock' if product_data['stock'] == 0 else 'In Stock'
+        product_data['stock_class'] = 'text-red-500 font-bold' if product_data['stock'] == 0 else 'text-green-500'
+        product_data['price_formatted'] = f"${product_data['price']:.2f}"
+        product_data['tag_names'] = [tag['name'] for tag in product_data['tags']]
+
+        filtered_products.append(product_data)
+
+    # Pagination
+    page_size = 20
+    total_products = len(filtered_products)
+    total_pages = (total_products + page_size - 1) // page_size
+    start_idx = (page - 1) * page_size
+    end_idx = min(start_idx + page_size, total_products)
+    paginated_products = filtered_products[start_idx:end_idx]
+
+    # Get popular tags (simulated)
+    popular_tags = []
+    tag_counts = {}
+    for p in DB['products']:
+        for tag in p.get('tags', []):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    for tag, count in list(tag_counts.items())[:20]:
+        popular_tags.append({'name': tag, 'usage_count': count})
+
+    return render_template('products.html',
+                         products=paginated_products,
+                         categories=DB['categories'],
+                         popular_tags=popular_tags,
+                         total_products=total_products,
+                         page=page,
+                         total_pages=total_pages,
+                         request=request)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -331,54 +421,389 @@ def remove_order_item(oid, sub_id, pid):
 
 @app.route('/vendor')
 def vendor_dashboard():
-    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR): return redirect(url_for('login', type='backend'))
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return redirect(url_for('login', type='backend'))
+
     vid = session['user']['id']
-    tab = request.args.get('tab', 'products')
+    tab = request.args.get('tab', 'overview')
+
+    # Get vendor information
+    vendor = next((v for v in DB['vendors'] if v['id'] == vid), None)
+    vendor_status = vendor['status'] if vendor else 'Unknown'
+
+    # Calculate statistics
     my_products = [p for p in DB['products'] if p['vendor_id'] == vid]
-    my_subs = [s for s in DB['sub_orders'] if s['vendor_id'] == vid and s['items']]
-    return render_template('vendor.html', products=my_products, sub_orders=my_subs, tab=tab)
+    total_products = len(my_products)
+    active_products = len([p for p in my_products if p['status'] == 'Active'])
+    total_stock = sum(p['stock'] for p in my_products)
+    out_of_stock = len([p for p in my_products if p['stock'] == 0])
+
+    stats = {
+        'total_products': total_products,
+        'active_products': active_products,
+        'total_stock': total_stock,
+        'out_of_stock': out_of_stock
+    }
+
+    # Display different content based on tab
+    if tab == 'recent_products':
+        # Recent products
+        recent_products = my_products[:10]  # Take the latest 10
+        formatted_products = []
+        for p in recent_products:
+            formatted_products.append({
+                'id': p['id'],
+                'name': p['title'],
+                'price': p['price'],
+                'stock': p['stock'],
+                'status': p['status'],
+                'image_url': p['image'],
+                'category': p['category']
+            })
+        return render_template('vendor_dashboard.html',
+                             vendor_status=vendor_status,
+                             stats=stats,
+                             recent_products=formatted_products,
+                             tab=tab)
+
+    elif tab == 'orders':
+        # Recent orders (simulated data)
+        recent_orders = []
+        my_subs = [s for s in DB['sub_orders'] if s['vendor_id'] == vid]
+        for sub in my_subs[:10]:  # Take the latest 10
+            recent_orders.append({
+                'id': sub['id'],
+                'customer_name': 'Customer',
+                'item_count': len(sub['items']),
+                'amount': sub['amount'],
+                'status': sub['logistics_status'],
+                'date': '2024-01-01'  # Simulated date
+            })
+        return render_template('vendor_dashboard.html',
+                             vendor_status=vendor_status,
+                             stats=stats,
+                             recent_orders=recent_orders,
+                             tab=tab)
+
+    elif tab == 'analytics':
+        # Analytics data (simulated)
+        analytics = {
+            'total_sales': 0.0,
+            'total_orders': 0,
+            'avg_order_value': 0.0,
+            'top_products': []
+        }
+        return render_template('vendor_dashboard.html',
+                             vendor_status=vendor_status,
+                             stats=stats,
+                             analytics=analytics,
+                             tab=tab)
+
+    else:
+        # Overview tab
+        # Product status distribution
+        product_status = []
+        status_counts = {}
+        for p in my_products:
+            status_counts[p['status']] = status_counts.get(p['status'], 0) + 1
+
+        for status, count in status_counts.items():
+            percentage = (count / total_products * 100) if total_products > 0 else 0
+            color = 'bg-green-500' if status == 'Active' else 'bg-yellow-500' if status == 'OutOfStock' else 'bg-gray-500'
+            product_status.append({
+                'status': status,
+                'count': count,
+                'percentage': percentage,
+                'color': color
+            })
+
+        # Low stock products
+        low_stock_products = []
+        for p in my_products:
+            if p['stock'] > 0 and p['stock'] < 10:  # Stock less than 10
+                low_stock_products.append({
+                    'id': p['id'],
+                    'name': p['title'],
+                    'stock': p['stock']
+                })
+
+        # Recent activity (simulated)
+        recent_activity = [
+            {
+                'icon': 'package',
+                'icon_bg': 'bg-blue-50',
+                'icon_color': 'text-blue-600',
+                'title': 'Product Added',
+                'description': 'Added "Wireless Headphones" to store',
+                'time': '2 hours ago'
+            },
+            {
+                'icon': 'trending-up',
+                'icon_bg': 'bg-green-50',
+                'icon_color': 'text-green-600',
+                'title': 'Stock Updated',
+                'description': 'Updated stock for "Ergonomic Office Chair"',
+                'time': '1 day ago'
+            }
+        ]
+
+        return render_template('vendor_dashboard.html',
+                             vendor_status=vendor_status,
+                             stats=stats,
+                             product_status=product_status,
+                             low_stock_products=low_stock_products[:5],  # Show at most 5
+                             recent_activity=recent_activity,
+                             tab=tab)
+
+@app.route('/vendor/products')
+def vendor_products():
+    """Vendor product management page"""
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return redirect(url_for('login', type='backend'))
+
+    vid = session['user']['id']
+    tab = request.args.get('tab', 'all')
+    page = int(request.args.get('page', 1))
+    edit_product_id = request.args.get('edit')
+
+    # Get vendor's products
+    my_products = [p for p in DB['products'] if p['vendor_id'] == vid]
+
+    # Filter by tab
+    if tab == 'active':
+        filtered_products = [p for p in my_products if p['status'] == 'Active']
+    elif tab == 'inactive':
+        filtered_products = [p for p in my_products if p['status'] == 'Inactive']
+    elif tab == 'inventory':
+        filtered_products = [p for p in my_products if p['status'] != 'Inactive']
+    else:
+        filtered_products = my_products
+
+    # Pagination
+    page_size = 20
+    total_products = len(filtered_products)
+    total_pages = (total_products + page_size - 1) // page_size
+    start_idx = (page - 1) * page_size
+    end_idx = min(start_idx + page_size, total_products)
+    paginated_products = filtered_products[start_idx:end_idx]
+
+    # Format product data
+    formatted_products = []
+    for p in paginated_products:
+        product_data = {
+            'id': p['id'],
+            'name': p['title'],
+            'price': p['price'],
+            'stock': p['stock'],
+            'status': p['status'],
+            'category': p['category'],
+            'image_url': p['image'],
+            'tags': [{'name': tag} for tag in p.get('tags', [])]
+        }
+        formatted_products.append(product_data)
+
+    # Get popular tags (simulated)
+    popular_tags = []
+    tag_counts = {}
+    for p in DB['products']:
+        for tag in p.get('tags', []):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    for tag, count in list(tag_counts.items())[:10]:
+        popular_tags.append({'name': tag, 'usage_count': count})
+
+    # Calculate pagination info
+    start_item = start_idx + 1 if total_products > 0 else 0
+    end_item = min(end_idx, total_products)
+
+    return render_template('vendor_products.html',
+                         products=formatted_products,
+                         categories=DB['categories'],
+                         popular_tags=popular_tags,
+                         total_products=total_products,
+                         page=page,
+                         total_pages=total_pages,
+                         start_item=start_item,
+                         end_item=end_item,
+                         tab=tab,
+                         edit_product_id=edit_product_id)
 
 @app.route('/vendor/product/save', methods=['POST'])
 def save_product():
-    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR): return redirect(url_for('login', type='backend'))
+    """Save product (create or update)"""
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return redirect(url_for('login', type='backend'))
+
     vid = session['user']['id']
-    pid = request.form.get('id')
-    
-    title = request.form.get('title')
+    pid = request.form.get('product_id')
+
+    # Get form data
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    category = request.form.get('category', 'General').strip()
+
     try:
-        price = float(request.form.get('price') or 0)
+        price = float(request.form.get('price', 0))
     except ValueError:
         price = 0.0
+
     try:
-        stock = int(request.form.get('stock') or 0)
+        stock = int(request.form.get('stock', 0))
     except ValueError:
         stock = 0
-    image = request.form.get('image')
+
+    image_url = request.form.get('image_url', '').strip()
     tags = [t.strip() for t in request.form.get('tags', '').split(',') if t.strip()]
-    
+    status = request.form.get('status', 'Active')
+
+    # Validate data
+    if not name:
+        flash('Product name is required')
+        return redirect(url_for('vendor_products'))
+
+    if price < 0:
+        flash('Price must be non-negative')
+        return redirect(url_for('vendor_products'))
+
+    if stock < 0:
+        flash('Stock must be non-negative')
+        return redirect(url_for('vendor_products'))
+
+    # Limit number of tags
+    if len(tags) > 3:
+        tags = tags[:3]
+        flash('Maximum 3 tags allowed. Only first 3 tags were saved.')
+
     if pid:
+        # Update existing product
         p = get_product(pid)
         if p and p['vendor_id'] == vid:
-            p.update({'title': title, 'price': price, 'stock': stock, 'image': image, 'tags': tags})
-            flash('Product updated.')
+            p.update({
+                'title': name,
+                'price': price,
+                'stock': stock,
+                'category': category,
+                'image': image_url if image_url else p.get('image', ''),
+                'tags': tags,
+                'status': status
+            })
+            flash('Product updated successfully.')
+        else:
+            flash('Product not found or you do not have permission to edit it.')
     else:
+        # Create new product
         new_p = {
-            'id': 'p' + str(uuid.uuid4())[:6],
-            'title': title, 'price': price, 'stock': stock, 'image': image, 'tags': tags,
-            'vendor_id': vid, 'category': 'General', 'status': 'Active', 'rating': 0.0
+            'id': 'p' + str(uuid.uuid4().hex[:8]).lower(),
+            'title': name,
+            'price': price,
+            'stock': stock,
+            'category': category,
+            'image': image_url if image_url else 'https://picsum.photos/seed/product/400/300',
+            'tags': tags,
+            'vendor_id': vid,
+            'status': status,
+            'rating': 0.0
         }
         DB['products'].append(new_p)
-        flash('Product added.')
-        
-    return redirect(url_for('vendor_dashboard', tab='products'))
+        flash('Product added successfully.')
 
-@app.route('/vendor/product/<pid>/toggle', methods=['POST'])
-def toggle_product(pid):
-    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR): return redirect(url_for('login', type='backend'))
-    p = get_product(pid)
-    if p and p['vendor_id'] == session['user']['id']:
-        p['status'] = 'Inactive' if p['status'] == 'Active' else 'Active'
-    return redirect(url_for('vendor_dashboard', tab='products'))
+    return redirect(url_for('vendor_products'))
+
+@app.route('/vendor/product/<product_id>/toggle', methods=['POST'])
+def toggle_product_status(product_id):
+    """Toggle product status"""
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return redirect(url_for('login', type='backend'))
+
+    vid = session['user']['id']
+    p = get_product(product_id)
+
+    if p and p['vendor_id'] == vid:
+        # Toggle status: Active <-> Inactive
+        if p['status'] == 'Active':
+            p['status'] = 'Inactive'
+            flash('Product deactivated.')
+        else:
+            p['status'] = 'Active'
+            flash('Product activated.')
+    else:
+        flash('Product not found or you do not have permission to update it.')
+
+    return redirect(url_for('vendor_products'))
+
+@app.route('/vendor/product/<product_id>/stock', methods=['POST'])
+def update_product_stock(product_id):
+    """Update product stock (AJAX interface)"""
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+    vid = session['user']['id']
+    p = get_product(product_id)
+
+    if not p or p['vendor_id'] != vid:
+        return jsonify({'success': False, 'message': 'Product not found or no permission'}), 404
+
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        amount = int(data.get('amount', 0))
+
+        if action == 'increase':
+            p['stock'] += amount
+        elif action == 'decrease':
+            if p['stock'] - amount < 0:
+                return jsonify({'success': False, 'message': 'Insufficient stock'}), 400
+            p['stock'] -= amount
+        else:
+            return jsonify({'success': False, 'message': 'Invalid action'}), 400
+
+        # Update status (if stock is 0)
+        if p['stock'] == 0 and p['status'] == 'Active':
+            p['status'] = 'OutOfStock'
+        elif p['stock'] > 0 and p['status'] == 'OutOfStock':
+            p['status'] = 'Active'
+
+        return jsonify({'success': True, 'stock': p['stock'], 'status': p['status']})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/vendor/products/bulk-stock', methods=['POST'])
+def bulk_update_stock():
+    """Bulk update stock"""
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return redirect(url_for('login', type='backend'))
+
+    vid = session['user']['id']
+    product_ids = request.form.getlist('product_ids')
+    action = request.form.get('action')
+    amount = int(request.form.get('amount', 0))
+    set_value = request.form.get('set_value')
+
+    updated_count = 0
+
+    for pid in product_ids:
+        p = get_product(pid)
+        if p and p['vendor_id'] == vid:
+            if action == 'increase':
+                p['stock'] += amount
+            elif action == 'decrease':
+                if p['stock'] - amount >= 0:
+                    p['stock'] -= amount
+                else:
+                    continue  # Skip products with insufficient stock
+            elif action == 'set' and set_value is not None:
+                p['stock'] = int(set_value)
+
+            # Update status
+            if p['stock'] == 0 and p['status'] == 'Active':
+                p['status'] = 'OutOfStock'
+            elif p['stock'] > 0 and p['status'] == 'OutOfStock':
+                p['status'] = 'Active'
+
+            updated_count += 1
+
+    flash(f'Updated stock for {updated_count} product(s).')
+    return redirect(url_for('vendor_products', tab='inventory'))
 
 @app.route('/vendor/transaction/<sub_id>/ship', methods=['POST'])
 def ship_order(sub_id):

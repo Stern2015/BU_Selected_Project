@@ -1,6 +1,6 @@
 """
 Auth Service
-处理身份认证相关的业务逻辑
+Handles business logic related to authentication
 """
 
 from driver.sql_executor import SQL_Executor

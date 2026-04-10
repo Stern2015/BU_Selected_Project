@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Page title and search bar -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Browse Products</h1>
+        <p class="text-gray-600">Discover amazing products from our vendors</p>
+    </div>
+
+    <!-- Search and filter bar -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+        <form method="GET" action="{{ url_for('products') }}" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Keyword search -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                    <input type="text" name="q" value="{{ request.args.get('q', '') }}"
+                           placeholder="Product name or description..."
+                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <!-- Category filter -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select name="category" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>
+                            {{ category }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Price range -->
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" name="min_price" value="{{ request.args.get('min_price', '') }}"
+                               placeholder="Min" step="0.01" min="0"
+                               class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <span class="text-gray-400">to</span>
+                        <input type="number" name="max_price" value="{{ request.args.get('max_price', '') }}"
+                               placeholder="Max" step="0.01" min="0"
+                               class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tag search -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
+                <input type="text" name="tags" value="{{ request.args.get('tags', '') }}"
+                       placeholder="e.g., electronics, wireless, premium"
+                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex justify-between items-center pt-2">
+                <div class="text-sm text-gray-500">
+                    {% if total_products %}
+                    Found {{ total_products }} product{% if total_products != 1 %}s{% endif %}
+                    {% endif %}
+                </div>
+                <div class="flex space-x-3">
+                    <button type="reset" onclick="window.location.href='{{ url_for('products') }}'"
+                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+                        Clear Filters
+                    </button>
+                    <button type="submit"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium flex items-center">
+                        <i data-lucide="search" class="h-4 w-4 mr-2"></i>
+                        Search Products
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tag cloud (popular tags) -->
+    {% if popular_tags %}
+    <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-3">Popular Tags</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for tag in popular_tags %}
+            <a href="{{ url_for('products', tags=tag.name) }}"
+               class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+                      {% if tag.name in request.args.get('tags', '') %}
+                      bg-indigo-100 text-indigo-800 border border-indigo-200
+                      {% else %}
+                      bg-gray-100 text-gray-800 hover:bg-gray-200
+                      {% endif %}">
+                {{ tag.name }}
+                <span class="ml-1.5 text-xs bg-white/50 rounded-full px-1.5 py-0.5">
+                    {{ tag.usage_count or 0 }}
+                </span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Product grid -->
+    {% if products %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {% for product in products %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+            <!-- Product image -->
+            <div class="relative h-48 overflow-hidden bg-gray-100">
+                <img src="{{ product.image_url or 'https://picsum.photos/seed/product/400/300' }}"
+                     alt="{{ product.name }}"
+                     class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                     onerror="this.src='https://picsum.photos/seed/product/400/300'">
+
+                <!-- Status tag -->
+                <div class="absolute top-3 left-3">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ product.status_class }}">
+                        {{ product.status_label }}
+                    </span>
+                </div>
+
+                <!-- Vendor tag -->
+                <div class="absolute top-3 right-3">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {{ product.store_name }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Product information -->
+            <div class="p-4">
+                <!-- Category and tags -->
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                        {{ product.category }}
+                    </span>
+                    <div class="flex items-center text-sm text-gray-500">
+                        <i data-lucide="star" class="h-3 w-3 mr-1 text-yellow-500 fill-current"></i>
+                        {{ "%.1f"|format(product.rating) }}
+                    </div>
+                </div>
+
+                <!-- Product name -->
+                <h3 class="font-semibold text-gray-900 mb-2 line-clamp-2 h-12">
+                    <a href="{{ url_for('product_detail', pid=product.id) }}"
+                       class="hover:text-indigo-600 transition-colors">
+                        {{ product.name }}
+                    </a>
+                </h3>
+
+                <!-- Product description -->
+                <p class="text-sm text-gray-600 mb-3 line-clamp-2 h-10">
+                    {{ product.description or 'No description available' }}
+                </p>
+
+                <!-- Tags -->
+                {% if product.tag_names %}
+                <div class="mb-3">
+                    <div class="flex flex-wrap gap-1">
+                        {% for tag in product.tag_names[:3] %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            {{ tag }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Price and stock -->
+                <div class="flex items-center justify-between pt-3 border-t border-gray-100">
+                    <div>
+                        <div class="text-xl font-bold text-gray-900">{{ product.price_formatted }}</div>
+                        <div class="text-sm {{ product.stock_class }}">
+                            {{ product.stock_status }} ({{ product.stock }} left)
+                        </div>
+                    </div>
+
+                    <!-- Action buttons -->
+                    <div class="flex space-x-2">
+                        <a href="{{ url_for('product_detail', pid=product.id) }}"
+                           class="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium flex items-center">
+                            <i data-lucide="eye" class="h-4 w-4 mr-1"></i>
+                            View
+                        </a>
+
+                        {% if session.get('login_type') == 'customer' and session.get('user') %}
+                        <form action="{{ url_for('add_to_cart', pid=product.id) }}" method="POST" class="inline">
+                            <button type="submit"
+                                    class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center"
+                                    {% if product.stock == 0 %}disabled{% endif %}>
+                                <i data-lucide="shopping-cart" class="h-4 w-4 mr-1"></i>
+                                Add
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="mt-8 flex justify-center">
+        <nav class="flex items-center space-x-2">
+            {% if page > 1 %}
+            <a href="{{ url_for('products', page=page-1, **request.args) }}"
+               class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                <i data-lucide="chevron-left" class="h-4 w-4"></i>
+            </a>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p == page %}
+                <span class="px-3 py-2 bg-indigo-600 text-white rounded-lg font-medium">
+                    {{ p }}
+                </span>
+                {% elif p >= page - 2 and p <= page + 2 %}
+                <a href="{{ url_for('products', page=p, **request.args) }}"
+                   class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                    {{ p }}
+                </a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('products', page=page+1, **request.args) }}"
+               class="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                <i data-lucide="chevron-right" class="h-4 w-4"></i>
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- No results -->
+    <div class="text-center py-12">
+        <div class="mx-auto w-24 h-24 text-gray-300 mb-4">
+            <i data-lucide="package-search" class="w-full h-full"></i>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No products found</h3>
+        <p class="text-gray-600 max-w-md mx-auto">
+            {% if request.args %}
+            Try adjusting your search filters or browse all products.
+            {% else %}
+            No products are available at the moment. Please check back later.
+            {% endif %}
+        </p>
+        {% if request.args %}
+        <a href="{{ url_for('products') }}"
+           class="mt-4 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+            Browse All Products
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+</style>
+
+<script>
+// Initialize icons
+lucide.createIcons();
+
+// Auto-submit form when selection changes (optional feature)
+document.addEventListener('DOMContentLoaded', function() {
+    const autoSubmitSelects = document.querySelectorAll('select[name="category"]');
+    autoSubmitSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}
