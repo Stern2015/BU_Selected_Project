@@ -2,7 +2,7 @@
 Transaction Manager
 Handles database transaction management
 """
-from db_connection import Connection_Manager
+from driver.db_connection import Connection_Manager
 
 class Transaction_Manager:
     def __init__(self):

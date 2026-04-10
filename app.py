@@ -1,6 +1,9 @@
 import uuid
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from services.vendor_service import VendorService
+from services.product_service import ProductService
+from services.auth_service import Auth_Service
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
@@ -430,6 +433,16 @@ def vendor_dashboard():
     # Get vendor information
     vendor = next((v for v in DB['vendors'] if v['id'] == vid), None)
     vendor_status = vendor['status'] if vendor else 'Unknown'
+    
+    # Create vendor_info dict for template
+    vendor_info = {
+        'id': vid,
+        'vendor_id': vid,
+        'business_name': vendor['name'] if vendor else 'Unknown Store',
+        'average_rating': vendor['rating'] if vendor else 0.0,
+        'geographical_presence': vendor['location'] if vendor else 'Unknown Location',
+        'status': vendor_status
+    }
 
     # Calculate statistics
     my_products = [p for p in DB['products'] if p['vendor_id'] == vid]
@@ -461,6 +474,7 @@ def vendor_dashboard():
                 'category': p['category']
             })
         return render_template('vendor_dashboard.html',
+                             vendor_info=vendor_info,
                              vendor_status=vendor_status,
                              stats=stats,
                              recent_products=formatted_products,
@@ -480,6 +494,7 @@ def vendor_dashboard():
                 'date': '2024-01-01'  # Simulated date
             })
         return render_template('vendor_dashboard.html',
+                             vendor_info=vendor_info,
                              vendor_status=vendor_status,
                              stats=stats,
                              recent_orders=recent_orders,
@@ -494,6 +509,7 @@ def vendor_dashboard():
             'top_products': []
         }
         return render_template('vendor_dashboard.html',
+                             vendor_info=vendor_info,
                              vendor_status=vendor_status,
                              stats=stats,
                              analytics=analytics,
@@ -548,12 +564,219 @@ def vendor_dashboard():
         ]
 
         return render_template('vendor_dashboard.html',
+                             vendor_info=vendor_info,
                              vendor_status=vendor_status,
                              stats=stats,
                              product_status=product_status,
                              low_stock_products=low_stock_products[:5],  # Show at most 5
                              recent_activity=recent_activity,
                              tab=tab)
+
+# --- NEW VENDOR ROUTES ---
+
+@app.route('/vendor/dashboard', methods=['GET'])
+def vendor_dashboard_alt():
+    """GET /vendor/dashboard - Render vendor dashboard page"""
+    # Check authentication and vendor role
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        flash('Please log in as a vendor.')
+        return redirect(url_for('login', type='backend'))
+    
+    vid = session['user']['id']
+    
+    # Get vendor information from in-memory DB
+    vendor = next((v for v in DB['vendors'] if v['id'] == vid), None)
+    vendor_info = {
+        'id': vid,
+        'business_name': vendor['name'] if vendor else 'Unknown Store',
+        'average_rating': vendor['rating'] if vendor else 0.0,
+        'geographical_presence': vendor['location'] if vendor else 'Unknown Location',
+        'status': vendor['status'] if vendor else 'Unknown'
+    }
+    
+    # Calculate statistics
+    my_products = [p for p in DB['products'] if p['vendor_id'] == vid]
+    stats = {
+        'total_products': len(my_products),
+        'active_products': len([p for p in my_products if p['status'] == 'Active']),
+        'total_stock': sum(p['stock'] for p in my_products),
+        'out_of_stock': len([p for p in my_products if p['stock'] == 0])
+    }
+    
+    return render_template('vendor_dashboard.html',
+                         vendor_info=vendor_info,
+                         stats=stats,
+                         products=my_products,
+                         tab='overview')
+
+
+@app.route('/vendor/onboard', methods=['POST'])
+def vendor_onboard():
+    """POST /vendor/onboard - Vendor onboarding"""
+    # Authentication check
+    if 'user' not in session or session.get('login_type') != 'backend':
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    user_id = session['user']['id']
+    
+    # Get form data
+    business_name = request.form.get('business_name', '').strip()
+    geographical_presence = request.form.get('geographical_presence', '').strip()
+    
+    # Validate input
+    if not business_name:
+        flash('Business name is required.')
+        return redirect(request.referrer or url_for('index'))
+    
+    if not geographical_presence:
+        flash('Location is required.')
+        return redirect(request.referrer or url_for('index'))
+    
+    # Check if user is already a vendor
+    existing_vendor = next((v for v in DB['vendors'] if v['id'] == user_id), None)
+    if existing_vendor:
+        flash('You are already a vendor.')
+        return redirect(url_for('vendor_dashboard'))
+    
+    # Add vendor to in-memory database
+    try:
+        DB['vendors'].append({
+            'id': user_id,
+            'name': business_name,
+            'rating': 0.0,
+            'location': geographical_presence,
+            'status': 'Active'
+        })
+        
+        # Update user role to include ROLE_VENDOR
+        user = session['user']
+        user['role'] |= ROLE_VENDOR
+        session.modified = True
+        
+        flash(f'Vendor onboarded successfully: {business_name}')
+        return redirect(url_for('vendor_dashboard'))
+        
+    except Exception as e:
+        flash(f'Error onboarding vendor: {str(e)}')
+        return redirect(request.referrer or url_for('index'))
+
+
+@app.route('/vendor/update', methods=['POST'])
+def vendor_update():
+    """POST /vendor/update - Update vendor information"""
+    # Authentication and vendor role check
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    vid = session['user']['id']
+    
+    # Get form data
+    business_name = request.form.get('business_name', '').strip()
+    geographical_presence = request.form.get('geographical_presence', '').strip()
+    
+    # Find and update vendor
+    vendor = next((v for v in DB['vendors'] if v['id'] == vid), None)
+    if not vendor:
+        return jsonify({'success': False, 'message': 'Vendor not found'}), 404
+    
+    # Update fields if provided
+    if business_name:
+        vendor['name'] = business_name
+    if geographical_presence:
+        vendor['location'] = geographical_presence
+    
+    flash('Vendor information updated successfully.')
+    
+    # Check if request is AJAX
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'message': 'Vendor updated successfully'})
+    
+    return redirect(url_for('vendor_dashboard'))
+
+
+@app.route('/vendor/products/add', methods=['POST'])
+def add_vendor_product():
+    """POST /vendor/products/add - Create a new product"""
+    # Authentication and vendor role check
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+    
+    vid = session['user']['id']
+    
+    # Get form data
+    product_name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    category = request.form.get('category', 'General').strip()
+    image_url = request.form.get('image_url', '').strip()
+    tags = request.form.get('tags', '').strip()
+    
+    # Parse price and stock
+    try:
+        price = float(request.form.get('price', 0))
+    except (ValueError, TypeError):
+        flash('Invalid price value.')
+        return redirect(url_for('vendor_products'))
+    
+    try:
+        stock = int(request.form.get('stock', 0))
+    except (ValueError, TypeError):
+        flash('Invalid stock value.')
+        return redirect(url_for('vendor_products'))
+    
+    # Validate required fields
+    if not product_name:
+        flash('Product name is required.')
+        return redirect(url_for('vendor_products'))
+    
+    if price < 0:
+        flash('Price cannot be negative.')
+        return redirect(url_for('vendor_products'))
+    
+    if stock < 0:
+        flash('Stock cannot be negative.')
+        return redirect(url_for('vendor_products'))
+    
+    # Parse and limit tags
+    tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+    if len(tag_list) > 3:
+        tag_list = tag_list[:3]
+        flash('Maximum 3 tags allowed. Only first 3 tags were saved.')
+    
+    # Create new product
+    try:
+        product_id = 'p' + str(uuid.uuid4().hex[:8]).lower()
+        
+        new_product = {
+            'id': product_id,
+            'title': product_name,
+            'description': description,
+            'price': price,
+            'stock': stock,
+            'category': category,
+            'image': image_url if image_url else 'https://picsum.photos/seed/product/400/300',
+            'tags': tag_list,
+            'vendor_id': vid,
+            'status': 'Active' if stock > 0 else 'OutOfStock',
+            'rating': 0.0
+        }
+        
+        DB['products'].append(new_product)
+        
+        flash(f'Product "{product_name}" added successfully.')
+        
+        # Return JSON if AJAX request
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Product created successfully',
+                'product_id': product_id
+            })
+        
+        return redirect(url_for('vendor_products'))
+        
+    except Exception as e:
+        flash(f'Error creating product: {str(e)}')
+        return redirect(url_for('vendor_products'))
 
 @app.route('/vendor/products')
 def vendor_products():

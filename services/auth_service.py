@@ -57,4 +57,73 @@ class Auth_Service:
             return user
         
         return None
+    
+    @staticmethod
+    def check_vendor_role(user):
+        """
+        Check if user has vendor role
+        
+        Args:
+            user (dict): User object/dictionary with 'role' key
+        
+        Returns:
+            bool: True if user has vendor role, False otherwise
+        """
+        if not user:
+            return False
+        
+        role = user.get('role', 0)
+        return bool(role & ROLE_VENDOR)
+    
+    @staticmethod
+    def check_admin_role(user):
+        """
+        Check if user has admin role
+        
+        Args:
+            user (dict): User object/dictionary with 'role' key
+        
+        Returns:
+            bool: True if user has admin role, False otherwise
+        """
+        if not user:
+            return False
+        
+        role = user.get('role', 0)
+        return bool(role & ROLE_ADMIN)
+    
+    @staticmethod
+    def check_customer_role(user):
+        """
+        Check if user has customer role
+        
+        Args:
+            user (dict): User object/dictionary with 'role' key
+        
+        Returns:
+            bool: True if user has customer role, False otherwise
+        """
+        if not user:
+            return False
+        
+        role = user.get('role', 0)
+        return bool(role & ROLE_CUSTOMER)
+    
+    @staticmethod
+    def has_role(user, role_flag):
+        """
+        Generic role checker
+        
+        Args:
+            user (dict): User object/dictionary with 'role' key
+            role_flag (int): Role bitmask to check
+        
+        Returns:
+            bool: True if user has the specified role, False otherwise
+        """
+        if not user:
+            return False
+        
+        role = user.get('role', 0)
+        return bool(role & role_flag)
         

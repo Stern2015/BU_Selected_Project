@@ -3,7 +3,7 @@ Raw SQL Execution
 Handles raw SQL assembly and execution (based on PyMySQL)
 """
 import pymysql
-from db_connection import Connection_Manager
+from driver.db_connection import Connection_Manager
 
 class SQL_Executor:
     def __init__(self):

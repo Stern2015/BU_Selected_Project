@@ -1,4 +1,4 @@
-from BaseDAO import BaseDAO
+from dao.BaseDAO import BaseDAO
 
 class UserDAO(BaseDAO):
     def __init__(self):
