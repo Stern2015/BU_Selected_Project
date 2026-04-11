@@ -2,11 +2,13 @@
 -- This file contains table structures for products, tags, vendors, etc.
 
 -- If tables exist, drop them first (for development environment only)
+DROP TABLE IF EXISTS Rating;
 DROP TABLE IF EXISTS Tagging;
 DROP TABLE IF EXISTS Tag;
 DROP TABLE IF EXISTS Product;
 DROP TABLE IF EXISTS Category;
 DROP TABLE IF EXISTS Vendor;
+DROP TABLE IF EXISTS Customer;
 
 -- Vendor table
 CREATE TABLE Vendor (
@@ -17,6 +19,28 @@ CREATE TABLE Vendor (
     Rating DECIMAL(3, 2) DEFAULT 0.00,
     Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     Updated_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Customer table
+CREATE TABLE Customer (
+    User_ID VARCHAR(50) PRIMARY KEY,
+    Nick_name VARCHAR(255),
+    Address VARCHAR(255)
+);
+
+-- Rating table (customer rates vendor)
+CREATE TABLE Rating (
+    Customer_ID VARCHAR(50) NOT NULL,
+    Vendor_ID VARCHAR(50) NOT NULL,
+    Score DECIMAL(3, 2) NOT NULL,
+    Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    Updated_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (Customer_ID, Vendor_ID),
+    FOREIGN KEY (Customer_ID) REFERENCES Customer(User_ID) ON DELETE CASCADE,
+    FOREIGN KEY (Vendor_ID) REFERENCES Vendor(Vendor_ID) ON DELETE CASCADE,
+    INDEX idx_rating_customer (Customer_ID),
+    INDEX idx_rating_vendor (Vendor_ID),
+    CHECK (Score BETWEEN 0.00 AND 5.00)
 );
 
 -- Category table (product categories)
