@@ -1,8 +1,3 @@
-"""
-Product DAO
-Handles product data access
-"""
-
 # Since we are using in-memory database, create a simple BaseDAO mock
 class MockBaseDAO:
     def __init__(self):

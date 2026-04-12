@@ -1,7 +1,3 @@
-"""
-Raw SQL Execution
-Handles raw SQL assembly and execution (based on PyMySQL)
-"""
 import pymysql
 from driver.db_connection import Connection_Manager
 
