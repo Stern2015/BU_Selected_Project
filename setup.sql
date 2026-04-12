@@ -9,6 +9,16 @@ DROP TABLE IF EXISTS Product;
 DROP TABLE IF EXISTS Category;
 DROP TABLE IF EXISTS Vendor;
 DROP TABLE IF EXISTS Customer;
+DROP TABLE IF EXISTS UserAccount;
+
+-- UserAccount table
+CREATE TABLE UserAccount (
+    User_ID INT AUTO_INCREMENT PRIMARY KEY,
+    Username VARCHAR(50),
+    PasswordHash VARCHAR(255),
+    Phone_Number VARCHAR(32),
+    Role_Bits INT
+);
 
 -- Vendor table
 CREATE TABLE Vendor (
