@@ -3,6 +3,7 @@ try:
 except ImportError:
     from BaseDAO import BaseDAO
 
+import json
 
 class CustomerDAO(BaseDAO):
     def __init__(self):
@@ -11,9 +12,9 @@ class CustomerDAO(BaseDAO):
     # Customer profile
     def get_customer_profile(self, customer_id):
         sql = """
-            SELECT ua.User_ID,ua.Username,ua.Phone_number,ua.Role,c.Nick_name,c.Address
-            FROM Customer c,UserAccount ua
-            WHERE c.User_ID = ua.User_ID AND c.User_ID = %s;
+            SELECT User_ID, Phone_number, Nick_name, Address, Order_History
+            FROM Customer
+            WHERE User_ID = %s
         """
         params = (customer_id,)
         return self.executor.execute_query_one(sql, params)
@@ -23,6 +24,9 @@ class CustomerDAO(BaseDAO):
 
         customer_updates = []
         customer_params = []
+        if phone_number is not None:
+            customer_updates.append("Phone_number = %s")
+            customer_params.append(phone_number)
         if nickname is not None:
             customer_updates.append("Nick_name = %s")
             customer_params.append(nickname)
@@ -35,35 +39,38 @@ class CustomerDAO(BaseDAO):
             customer_params.append(customer_id)
             affected += self.executor.execute_update(sql, tuple(customer_params))
 
-        if phone_number is not None:
-            sql = "UPDATE UserAccount SET Phone_number = %s WHERE User_ID = %s"
-            params = (phone_number, customer_id)
-            affected += self.executor.execute_update(sql, params)
-
         return affected
+
     # Product browsing
     def get_all_products(self, keyword=None, vendor_id=None, tag_id=None):
-        sql = """
-            SELECT DISTINCT p.*
-            FROM Product p
-            LEFT JOIN Tagging tg ON p.Product_ID = tg.Product_ID
-            WHERE 1=1
-        """
+        sql = "SELECT DISTINCT p.* FROM Product p"
         params = []
 
-        if keyword:
-            sql += " AND p.Name LIKE %s"
-            params.append(f"%{keyword}%")
-
-        if vendor_id is not None:
-            sql += " AND p.Vendor_ID = %s"
-            params.append(vendor_id)
-
         if tag_id is not None:
-            sql += " AND tg.Tag_ID = %s"
+            sql += " JOIN Tagging tg ON p.Product_ID = tg.Product_ID"
+            sql += " WHERE tg.Tag_ID = %s"
             params.append(tag_id)
 
-        return self.executor.execute_query(sql, tuple(params))
+            if keyword:
+                sql += " AND p.Name LIKE %s"
+                params.append(f"%{keyword}%")
+            if vendor_id is not None:
+                sql += " AND p.Vendor_ID = %s"
+                params.append(vendor_id)
+        else:
+            if keyword:
+                sql += " WHERE p.Name LIKE %s"
+                params.append(f"%{keyword}%")
+
+                if vendor_id is not None:
+                    sql += " AND p.Vendor_ID = %s"
+                    params.append(vendor_id)
+            else:
+                if vendor_id is not None:
+                    sql += " WHERE p.Vendor_ID = %s"
+                    params.append(vendor_id)
+
+        return self.executor.execute_query(sql, tuple(params) if params else None)
 
     def get_product_by_id(self, product_id):
         sql = """
@@ -90,114 +97,43 @@ class CustomerDAO(BaseDAO):
         sql = "SELECT Tag_ID, Name FROM Tag ORDER BY Name"
         return self.executor.execute_query(sql)
 
-    def get_vendor_by_id(self, vendor_id):
-        sql = "SELECT * FROM Vendor WHERE Vendor_ID = %s"
-        params = (vendor_id,)
-        return self.executor.execute_query_one(sql, params)
-
-    # Inventory
-    def get_product_stock(self, product_id):
-        sql = "SELECT Stock FROM Product WHERE Product_ID = %s"
-        params = (product_id,)
-        return self.executor.execute_query_one(sql, params)
-
-    def decrease_product_stock(self, product_id, quantity):
-        sql = """
-            UPDATE Product
-            SET Stock = Stock - %s
-            WHERE Product_ID = %s AND Stock >= %s
-        """
-        params = (quantity, product_id, quantity)
-        return self.executor.execute_update(sql, params)
-
-    def restore_product_stock(self, product_id, quantity):
-        sql = "UPDATE Product SET Stock = Stock + %s WHERE Product_ID = %s"
-        params = (quantity, product_id)
-        return self.executor.execute_update(sql, params)
-
     # Order
+    def get_order_history(self, customer_id):
+        sql = "SELECT Order_History FROM Customer WHERE User_ID = %s"
+        result = self.executor.execute_query_one(sql, (customer_id,))
+        if not result or not result.get("Order_History"):
+            return []
+        return json.loads(result["Order_History"])
+
+    def save_order_history(self, customer_id, orders):
+        sql = "UPDATE Customer SET Order_History = %s WHERE User_ID = %s"
+        return self.executor.execute_update(sql, (json.dumps(orders, ensure_ascii=False), customer_id))
+
     def create_order(self, order_id, customer_id, order_date, status, total_payment):
-        sql = """
-            INSERT INTO `Order` (Order_ID, Customer_ID, Order_Date, Status, Total_Payment)
-            VALUES (%s, %s, %s, %s, %s)
-        """
-        params = (order_id, customer_id, order_date, status, total_payment)
-        return self.executor.execute_update(sql, params)
+        orders = self.get_order_history(customer_id)
+        orders.append(
+            {
+                "Order_ID": str(order_id),
+                "Order_Date": str(order_date),
+                "Status": str(status),
+                "Total_Payment": str(total_payment),
+            }
+        )
+        return self.save_order_history(customer_id, orders)
 
     def get_orders_by_customer(self, customer_id):
-        sql = """
-            SELECT *
-            FROM `Order`
-            WHERE Customer_ID = %s
-            ORDER BY Order_Date DESC
-        """
-        params = (customer_id,)
-        return self.executor.execute_query(sql, params)
-
-    def get_order_by_id(self, order_id, customer_id=None):
-        sql = "SELECT * FROM `Order` WHERE Order_ID = %s"
-        params = [order_id]
-        if customer_id is not None:
-            sql += " AND Customer_ID = %s"
-            params.append(customer_id)
-        return self.executor.execute_query_one(sql, tuple(params))
+        return self.get_order_history(customer_id)
 
     def cancel_order(self, order_id, customer_id):
-        sql = """
-            UPDATE `Order`
-            SET Status = 'Cancelled'
-            WHERE Order_ID = %s AND Customer_ID = %s
-        """
-        params = (order_id, customer_id)
-        return self.executor.execute_update(sql, params)
-
-    # Transaction
-    def create_transaction(self, transaction_id, order_id, vendor_id, payment_amount):
-        sql = """
-            INSERT INTO `Transaction` (Transaction_ID, Order_ID, Vendor_ID, Payment_Amount)
-            VALUES (%s, %s, %s, %s)
-        """
-        params = (transaction_id, order_id, vendor_id, payment_amount)
-        return self.executor.execute_update(sql, params)
-
-    def get_transactions_by_order_id(self, order_id):
-        sql = """
-            SELECT *
-            FROM `Transaction`
-            WHERE Order_ID = %s
-            ORDER BY Transaction_ID
-        """
-        params = (order_id,)
-        return self.executor.execute_query(sql, params)
-
-    def get_transaction_by_id(self, transaction_id):
-        sql = "SELECT * FROM `Transaction` WHERE Transaction_ID = %s"
-        params = (transaction_id,)
-        return self.executor.execute_query_one(sql, params)
-
-    # Order items
-    def create_order_item(self, transaction_id, product_id, quantity, price):
-        sql = """
-            INSERT INTO Order_Items (Transaction_ID, Product_ID, Quantity, Price)
-            VALUES (%s, %s, %s, %s)
-        """
-        params = (transaction_id, product_id, quantity, price)
-        return self.executor.execute_update(sql, params)
-
-    def get_order_items_by_transaction_id(self, transaction_id):
-        sql = """
-            SELECT oi.*, p.Name AS Product_Name, p.Image_URL
-            FROM Order_Items oi
-            LEFT JOIN Product p ON oi.Product_ID = p.Product_ID
-            WHERE oi.Transaction_ID = %s
-        """
-        params = (transaction_id,)
-        return self.executor.execute_query(sql, params)
-
-    def remove_order_item(self, transaction_id, product_id):
-        sql = "DELETE FROM Order_Items WHERE Transaction_ID = %s AND Product_ID = %s"
-        params = (transaction_id, product_id)
-        return self.executor.execute_update(sql, params)
+        orders = self.get_order_history(customer_id)
+        updated = False
+        for order in orders:
+            if str(order.get("Order_ID")) == str(order_id):
+                order["Status"] = "Cancelled"
+                updated = True
+        if not updated:
+            return 0
+        return self.save_order_history(customer_id, orders)
 
     # Rating
     def get_rating(self, customer_id, vendor_id):
@@ -205,17 +141,16 @@ class CustomerDAO(BaseDAO):
         params = (customer_id, vendor_id)
         return self.executor.execute_query_one(sql, params)
 
-    def add_rating(self, customer_id, vendor_id, score):
-        sql = "INSERT INTO Rating (Customer_ID, Vendor_ID, Score) VALUES (%s, %s, %s)"
-        params = (customer_id, vendor_id, score)
+    def set_rating(self, customer_id, vendor_id, score):
+        sql = """
+            INSERT INTO Rating (Customer_ID, Vendor_ID, Score)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE Score = %s
+        """
+        params = (customer_id, vendor_id, score, score)
         return self.executor.execute_update(sql, params)
 
-    def update_rating(self, customer_id, vendor_id, score):
-        sql = "UPDATE Rating SET Score = %s WHERE Customer_ID = %s AND Vendor_ID = %s"
-        params = (score, customer_id, vendor_id)
-        return self.executor.execute_update(sql, params)
-
-    def get_ratings_by_customer(self, customer_id):
+    def get_rating_from_customer(self, customer_id):
         sql = """
             SELECT r.*, v.Store_Name
             FROM Rating r

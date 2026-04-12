@@ -34,23 +34,19 @@ CREATE TABLE Vendor (
 -- Customer table
 CREATE TABLE Customer (
     User_ID VARCHAR(50) PRIMARY KEY,
+    Phone_number VARCHAR(50),
     Nick_name VARCHAR(255),
-    Address VARCHAR(255)
+    Address VARCHAR(255),
+    Order_History TEXT
 );
 
 -- Rating table (customer rates vendor)
 CREATE TABLE Rating (
-    Customer_ID VARCHAR(50) NOT NULL,
-    Vendor_ID VARCHAR(50) NOT NULL,
-    Score DECIMAL(3, 2) NOT NULL,
+    Customer_ID VARCHAR(50),
+    Vendor_ID VARCHAR(50),
+    Score INT,
     Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    Updated_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (Customer_ID, Vendor_ID),
-    FOREIGN KEY (Customer_ID) REFERENCES Customer(User_ID) ON DELETE CASCADE,
-    FOREIGN KEY (Vendor_ID) REFERENCES Vendor(Vendor_ID) ON DELETE CASCADE,
-    INDEX idx_rating_customer (Customer_ID),
-    INDEX idx_rating_vendor (Vendor_ID),
-    CHECK (Score BETWEEN 0.00 AND 5.00)
+    PRIMARY KEY (Customer_ID, Vendor_ID)
 );
 
 -- Category table (product categories)
