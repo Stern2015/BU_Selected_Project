@@ -133,16 +133,6 @@ CREATE TABLE Tagging (
 
 -- Insert sample data
 
-<<<<<<< HEAD
-INSERT INTO UserAccount (Username, PasswordHash, Phone_Number, Role_Bits) VALUES
-('Admin1', '123', '1300000000', 4),
-('User1', '123', '1300000000', 1),
-('User2', '123', '1300000000', 1),
-('Vendor1', '123', '1300000000', 2),
-('Vendor2', '123', '1300000000', 2);
-
-=======
->>>>>>> aefcee1 (refine SQL add sample data)
 INSERT INTO Category (Name, Description) VALUES
 ('Electronics', 'Electronic devices and accessories'),
 ('Furniture', 'Home and office furniture'),
