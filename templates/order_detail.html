@@ -48,7 +48,7 @@
             
             <div class="space-y-8">
                 {% for sub in sub_orders %}
-                {% if sub.items %}
+                {% if sub['items'] %}
                 <div class="border border-gray-200 rounded-lg overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                         <div class="flex items-center">
@@ -71,7 +71,7 @@
                     </div>
                     
                     <ul class="divide-y divide-gray-100 p-4">
-                        {% for item in sub.items %}
+                        {% for item in sub['items'] %}
                         {% set p = get_product(item.product_id) %}
                         {% if p %}
                         <li class="py-4 flex justify-between items-center">

@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from services.vendor_service import VendorService
 from services.product_service import ProductService
 from services.auth_service import Auth_Service
+from services.order_service import OrderService
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
@@ -299,55 +300,61 @@ def remove_from_cart(pid):
 
 @app.route('/cart/checkout', methods=['POST'])
 def checkout():
-    if 'user' not in session or session.get('login_type') != 'customer': return redirect(url_for('login', type='customer'))
-    uid = session['user']['id']
+    if 'user' not in session or session.get('login_type') != 'customer':
+        return redirect(url_for('login', type='customer'))
+    uid  = session['user']['id']
     cart = DB['carts'].get(uid, [])
-    if not cart: return redirect(url_for('view_cart'))
-    
-    # Pre-check stock and availability
+    if not cart:
+        return redirect(url_for('view_cart'))
+
+    # 校验库存（原有逻辑不变）
     for item in cart:
         p = get_product(item['product_id'])
         if not p:
             flash(f"A product in your cart is no longer available.")
             return redirect(url_for('view_cart'))
-            
         v = next((v for v in DB['vendors'] if v['id'] == p['vendor_id']), None)
         if not v or v['status'] != 'Active' or p['status'] != 'Active':
             flash(f"Sorry, {p['title']} is currently unavailable.")
             return redirect(url_for('view_cart'))
-            
         if item['quantity'] > p['stock']:
             flash(f"Sorry, {p['title']} only has {p['stock']} left in stock.")
             return redirect(url_for('view_cart'))
-    
-    order_id = 'ORD-' + str(uuid.uuid4())[:8].upper()
-    total_amount = 0
-    sub_orders_map = {} # vendor_id -> items
-    
-    for item in cart:
-        p = get_product(item['product_id'])
-        if p:
-            p['stock'] -= item['quantity'] # Deduct stock
-            total_amount += p['price'] * item['quantity']
-            vid = p['vendor_id']
-            if vid not in sub_orders_map: sub_orders_map[vid] = []
-            sub_orders_map[vid].append({'product_id': p['id'], 'quantity': item['quantity'], 'price': p['price']})
-            
+
+    # ★ 写入 MySQL
+    try:
+        order_service = OrderService()
+        order_id, total_amount, sub_orders_map = order_service.create_order(
+            customer_id=uid,
+            cart_items=cart,
+            get_product_fn=get_product
+        )
+    except Exception as e:
+        flash(f'下单失败，请稍后重试：{str(e)}')
+        return redirect(url_for('view_cart'))
+
+    # 保留内存操作（让订单详情页能正常显示）
     order = {
         'id': order_id, 'user_id': uid, 'total_amount': total_amount,
         'status': 'Pending', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
     }
     DB['orders'].append(order)
-    
     for vid, items in sub_orders_map.items():
         sub_amount = sum(i['price'] * i['quantity'] for i in items)
         sub_order = {
             'id': f"SUB-{order_id}-{vid}", 'order_id': order_id, 'vendor_id': vid,
-            'items': items, 'amount': sub_amount, 'payment_status': 'Paid', 'logistics_status': 'Pending'
+            'items': items, 'amount': sub_amount,
+            'payment_status': 'Paid', 'logistics_status': 'Pending'
         }
         DB['sub_orders'].append(sub_order)
-        
+
+    # 扣库存、清购物车
+    for item in cart:
+        p = get_product(item['product_id'])
+        if p:
+            p['stock'] -= item['quantity']
     DB['carts'][uid] = []
+
     flash('Order placed successfully!')
     return redirect(url_for('order_detail', oid=order_id))
 
