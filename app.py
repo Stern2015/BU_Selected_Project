@@ -1,9 +1,6 @@
 import uuid
-from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from services.vendor_service import VendorService
-from services.product_service import ProductService
-from services.auth_service import Auth_Service
 from services.order_service import OrderService
 
 app = Flask(__name__)
@@ -335,6 +332,11 @@ def checkout():
     if not cart:
         return redirect(url_for('view_cart'))
 
+    shipping_address = request.form.get('shipping_address', '').strip()
+    if not shipping_address:
+        flash('Shipping address is required.')
+        return redirect(url_for('view_cart'))
+
     # 校验库存（原有逻辑不变）
     for item in cart:
         p = get_product(item['product_id'])
@@ -352,31 +354,20 @@ def checkout():
     # ★ Write to MySQL via OrderService
     try:
         order_service = OrderService()
-        order_id, total_amount, sub_orders_map = order_service.create_order(
+        order_id = order_service.create_order(
             customer_id=uid,
+            shipping_address=shipping_address,
             cart_items=cart,
             get_product_fn=get_product
         )
+        if not order_id:
+            flash('Failed to create order. Please try again.')
+            return redirect(url_for('view_cart'))
     except Exception as e:
-        flash(f'下单失败，请稍后重试：{str(e)}')
+        flash(f'Failed to place order: {str(e)}')
         return redirect(url_for('view_cart'))
 
-    # 保留内存操作（让订单详情页能正常显示）
-    order = {
-        'id': order_id, 'user_id': uid, 'total_amount': total_amount,
-        'status': 'Pending', 'created_at': datetime.now().strftime('%Y-%m-%d %H:%M')
-    }
-    DB['orders'].append(order)
-    for vid, items in sub_orders_map.items():
-        sub_amount = sum(i['price'] * i['quantity'] for i in items)
-        sub_order = {
-            'id': f"SUB-{order_id}-{vid}", 'order_id': order_id, 'vendor_id': vid,
-            'items': items, 'amount': sub_amount,
-            'payment_status': 'Paid', 'logistics_status': 'Pending'
-        }
-        DB['sub_orders'].append(sub_order)
-
-    # 扣库存、清购物车
+    # Update in-memory stock and clear cart
     for item in cart:
         p = get_product(item['product_id'])
         if p:
@@ -388,71 +379,54 @@ def checkout():
 
 @app.route('/orders')
 def order_list():
-    if 'user' not in session or session.get('login_type') != 'customer' or not has_role(session['user'], ROLE_CUSTOMER): return redirect(url_for('login', type='customer'))
+    if 'user' not in session or session.get('login_type') != 'customer' or not has_role(session['user'], ROLE_CUSTOMER): 
+        return redirect(url_for('login', type='customer'))
     uid = session['user']['id']
-    my_orders = [o for o in DB['orders'] if o['user_id'] == uid]
-    my_orders.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # Get from MySQL
+    order_service = OrderService()
+    my_orders = order_service.get_customer_orders(uid)
     return render_template('orders.html', orders=my_orders)
 
 @app.route('/orders/<oid>')
 def order_detail(oid):
-    if 'user' not in session or session.get('login_type') != 'customer': return redirect(url_for('login', type='customer'))
-    order = next((o for o in DB['orders'] if o['id'] == oid), None)
-    if not order: return "Order not found", 404
-    subs = [s for s in DB['sub_orders'] if s['order_id'] == oid]
-    return render_template('order_detail.html', order=order, sub_orders=subs)
+    if 'user' not in session or session.get('login_type') != 'customer': 
+        return redirect(url_for('login', type='customer'))
+    
+    # Get from MySQL
+    order_service = OrderService()
+    order = order_service.get_order_details(oid)
+    if not order: 
+        return "Order not found", 404
+        
+    return render_template('order_detail.html', order=order)
 
 @app.route('/orders/<oid>/cancel', methods=['POST'])
 def cancel_order(oid):
-    order = next((o for o in DB['orders'] if o['id'] == oid), None)
-    if order and order['status'] == 'Pending':
-        subs = [s for s in DB['sub_orders'] if s['order_id'] == oid]
-        if any(s['logistics_status'] not in ['Pending', 'Cancelled'] for s in subs):
-            flash('Cannot cancel entire order because some items have already been shipped.')
-            return redirect(url_for('order_detail', oid=oid))
-            
-        order['status'] = 'Cancelled'
-        for s in subs:
-            if s['logistics_status'] != 'Cancelled':
-                s['logistics_status'] = 'Cancelled'
-                s['payment_status'] = 'Refunded'
-                # Restore stock
-                for item in s['items']:
-                    p = get_product(item['product_id'])
-                    if p:
-                        p['stock'] += item['quantity']
-        flash('Order cancelled.')
+    if 'user' not in session:
+        return redirect(url_for('login'))
+        
+    order_service = OrderService()
+    success = order_service.cancel_order(oid)
+    if success:
+        flash('Order cancelled successfully.')
+    else:
+        flash('Cannot cancel order. It might already be shipped.')
+        
     return redirect(url_for('order_detail', oid=oid))
 
-@app.route('/orders/<oid>/remove_item/<sub_id>/<pid>', methods=['POST'])
-def remove_order_item(oid, sub_id, pid):
-    order = next((o for o in DB['orders'] if o['id'] == oid), None)
-    sub = next((s for s in DB['sub_orders'] if s['id'] == sub_id), None)
-    
-    if order and sub and order['status'] == 'Pending' and sub['logistics_status'] == 'Pending':
-        # Remove item
-        item_to_remove = next((i for i in sub['items'] if i['product_id'] == pid), None)
-        if item_to_remove:
-            # Restore stock
-            p = get_product(item_to_remove['product_id'])
-            if p:
-                p['stock'] += item_to_remove['quantity']
-                
-            sub['items'].remove(item_to_remove)
-            deduct_amount = item_to_remove['price'] * item_to_remove['quantity']
-            sub['amount'] -= deduct_amount
-            order['total_amount'] -= deduct_amount
-            
-            if not sub['items']:
-                sub['logistics_status'] = 'Cancelled'
-                sub['payment_status'] = 'Refunded'
-                
-            active_subs = [s for s in DB['sub_orders'] if s['order_id'] == oid and s['logistics_status'] != 'Cancelled']
-            if not active_subs:
-                order['status'] = 'Cancelled'
-                
-            flash('Item removed from order.')
-            
+@app.route('/orders/<oid>/remove_item/<item_id>', methods=['POST'])
+def remove_order_item(oid, item_id):
+    if 'user' not in session:
+        return redirect(url_for('login'))
+        
+    order_service = OrderService()
+    success = order_service.remove_item_from_order(item_id)
+    if success:
+        flash('Item removed from order.')
+    else:
+        flash('Cannot remove item. Order might already be shipped or item not found.')
+        
     return redirect(url_for('order_detail', oid=oid))
 
 # --- VENDOR ROUTES ---
@@ -959,6 +933,7 @@ def save_product():
         if p and p['vendor_id'] == vid:
             p.update({
                 'title': name,
+                'description': description,
                 'price': price,
                 'stock': stock,
                 'category': category,
@@ -974,6 +949,7 @@ def save_product():
         new_p = {
             'id': 'p' + str(uuid.uuid4().hex[:8]).lower(),
             'title': name,
+            'description': description,
             'price': price,
             'stock': stock,
             'category': category,
