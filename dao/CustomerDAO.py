@@ -110,16 +110,14 @@ class CustomerDAO(BaseDAO):
         return self.executor.execute_update(sql, (json.dumps(orders, ensure_ascii=False), customer_id))
 
     def create_order(self, order_id, customer_id, order_date, status, total_payment):
-        orders = self.get_order_history(customer_id)
-        orders.append(
-            {
-                "Order_ID": str(order_id),
-                "Order_Date": str(order_date),
-                "Status": str(status),
-                "Total_Payment": str(total_payment),
-            }
-        )
-        return self.save_order_history(customer_id, orders)
+        sql = """
+            INSERT INTO `Order`
+                (Order_ID, Customer_ID, Order_Date, Status, Total_Payment)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        return self.executor.execute_update(
+        sql, (order_id, customer_id, order_date, status, total_payment)
+    )
 
     def get_orders_by_customer(self, customer_id):
         return self.get_order_history(customer_id)
@@ -134,6 +132,44 @@ class CustomerDAO(BaseDAO):
         if not updated:
             return 0
         return self.save_order_history(customer_id, orders)
+
+# Transaction
+    def create_transaction(self, transaction_id, order_id, vendor_id, payment_amount):
+        sql = """
+            INSERT INTO `Transaction`
+                (Transaction_ID, Order_ID, Vendor_ID, Payment_Amount)
+            VALUES (%s, %s, %s, %s)
+     """
+        return self.executor.execute_update(
+            sql, (transaction_id, order_id, vendor_id, payment_amount)
+    )
+
+    def get_transactions_by_order_id(self, order_id):
+        sql = "SELECT * FROM `Transaction` WHERE Order_ID = %s"
+        return self.executor.execute_query(sql, (order_id,))
+
+    def get_transaction_by_id(self, transaction_id):
+        sql = "SELECT * FROM `Transaction` WHERE Transaction_ID = %s"
+        return self.executor.execute_query_one(sql, (transaction_id,))
+
+# Order items
+    def create_order_item(self, transaction_id, product_id, quantity, price):
+        sql = """
+            INSERT INTO Order_Items
+                (Transaction_ID, Product_ID, Quantity, Price)
+            VALUES (%s, %s, %s, %s)
+        """
+        return self.executor.execute_update(
+        sql, (transaction_id, product_id, quantity, price)
+    )
+
+    def get_order_items_by_transaction_id(self, transaction_id):
+        sql = "SELECT * FROM Order_Items WHERE Transaction_ID = %s"
+        return self.executor.execute_query(sql, (transaction_id,))
+
+    def remove_order_item(self, transaction_id, product_id):
+        sql = "DELETE FROM Order_Items WHERE Transaction_ID = %s AND Product_ID = %s"
+        return self.executor.execute_update(sql, (transaction_id, product_id))
 
     # Rating
     def get_rating(self, customer_id, vendor_id):

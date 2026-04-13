@@ -12,7 +12,7 @@ class Transaction_Manager:
         conn = self.conn_manager.get_connection()
 
         try:
-            with conn.cursor as cursor:
+            with conn.cursor() as cursor:
                 conn.autocommit(False)
                 for sql, params in operations:
                     cursor.execute(sql, params)
