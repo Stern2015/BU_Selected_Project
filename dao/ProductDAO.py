@@ -12,11 +12,6 @@ class ProductDAO(BaseDAO):
         ]
         params = []
 
-        if keyword:
-            like = f"%{keyword}%"
-            clauses.append("(p.Name LIKE %s OR COALESCE(p.Description, '') LIKE %s)")
-            params.extend([like, like])
-
         if category:
             clauses.append("p.Category = %s")
             params.append(category)
@@ -29,18 +24,31 @@ class ProductDAO(BaseDAO):
             clauses.append("p.Price <= %s")
             params.append(max_price)
 
+        # Unified Search/Discovery Logic:
+        # "where the tag matches any part of the product's name or its associated tags"
+        search_terms = []
+        if keyword:
+            search_terms.append(keyword)
         if tags:
-            placeholders = ", ".join(["%s"] * len(tags))
-            clauses.append(f"""
-                EXISTS (
-                    SELECT 1
-                    FROM Tagging tg2
-                    JOIN Tag t2 ON t2.Tag_ID = tg2.Tag_ID
-                    WHERE tg2.Product_ID = p.Product_ID
-                      AND LOWER(t2.Name) IN ({placeholders})
-                )
-            """)
-            params.extend([tag.lower() for tag in tags])
+            search_terms.extend(tags)
+
+        if search_terms:
+            term_clauses = []
+            for term in search_terms:
+                like_pattern = f"%{term}%"
+                # Matches Name OR associated tags
+                term_clauses.append(f"""
+                    (p.Name LIKE %s OR EXISTS (
+                        SELECT 1 FROM Tagging tg_s
+                        JOIN Tag t_s ON t_s.Tag_ID = tg_s.Tag_ID
+                        WHERE tg_s.Product_ID = p.Product_ID
+                          AND (t_s.Name LIKE %s OR LOWER(t_s.Name) = LOWER(%s))
+                    ))
+                """)
+                params.extend([like_pattern, like_pattern, term])
+            
+            # Combine multiple terms with OR for broader discovery
+            clauses.append("(" + " OR ".join(term_clauses) + ")")
 
         return " AND ".join(clauses), params
 

@@ -26,12 +26,9 @@ class Connection_Manager:
                 'charset': config_parser['Database']['Charset'],
                 'cursorclass': pymysql.cursors.DictCursor
             }
-            # Persistent connection for development
             cm._instance_._conn = None
 
         return cm._instance_
     
     def get_connection(self):
-        # Always return a fresh connection to avoid state pollution and thread safety issues.
-        # Performance is maintained by the earlier N+1 query optimizations.
         return pymysql.connect(**self.config)
