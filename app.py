@@ -175,8 +175,28 @@ def logout():
 def view_cart():
     if 'user' not in session or session.get('login_type') != 'customer' or not has_role(session['user'], ROLE_CUSTOMER): return redirect(url_for('login', type='customer'))
     cart_items = session.get('cart', [])
-    total = sum(get_product(item['product_id'])['price'] * item['quantity'] for item in cart_items if get_product(item['product_id']))
-    return render_template('cart.html', cart_items=cart_items, total=total)
+    
+    if not cart_items:
+        return render_template('cart.html', cart_items=[], total=0)
+
+    # Batch fetch product details
+    pids = [item['product_id'] for item in cart_items]
+    product_details = product_dao.get_products_by_ids(pids)
+    
+    # Map for easy lookup in template
+    product_map = {p['id']: p for p in product_details}
+    
+    enriched_items = []
+    total = 0
+    for item in cart_items:
+        p_info = product_map.get(item['product_id'])
+        if p_info:
+            item_with_details = item.copy()
+            item_with_details['product'] = p_info
+            enriched_items.append(item_with_details)
+            total += p_info['price'] * item['quantity']
+            
+    return render_template('cart.html', cart_items=enriched_items, total=total)
 
 @app.route('/cart/add/<pid>', methods=['POST'])
 def add_to_cart(pid):
@@ -379,20 +399,14 @@ def vendor_dashboard():
         'status': vendor_status
     }
 
-    # Calculate statistics from database
-    product_stats = product_dao.count_vendor_products(vid, tab='all')
-    active_stats = product_dao.count_vendor_products(vid, tab='active')
+    # Calculate statistics from database efficiently
+    db_stats = product_dao.get_vendor_stats(vid)
     
-    # We need a few more specific stats for the dashboard
-    my_products = product_dao.list_vendor_products(vid, limit=1000) # Get all for stats
-    total_stock = sum(p['stock'] for p in my_products)
-    out_of_stock = len([p for p in my_products if p['stock'] == 0])
-
     stats = {
-        'total_products': product_stats,
-        'active_products': active_stats,
-        'total_stock': total_stock,
-        'out_of_stock': out_of_stock
+        'total_products': int(db_stats['total_products'] or 0),
+        'active_products': int(db_stats['active_products'] or 0),
+        'total_stock': int(db_stats['total_stock'] or 0),
+        'out_of_stock': int(db_stats['out_of_stock'] or 0)
     }
 
     # Display different content based on tab
@@ -417,9 +431,11 @@ def vendor_dashboard():
                              tab=tab)
 
     elif tab == 'analytics':
+        order_service = OrderService()
+        vendor_orders = order_service.get_vendor_orders(vid)
         analytics = {
-            'total_sales': sum(float(o['sub_total_amount']) for o in order_service.get_vendor_orders(vid) if o['status'] != 'cancelled'),
-            'total_orders': len(order_service.get_vendor_orders(vid)),
+            'total_sales': sum(float(o['sub_total_amount']) for o in vendor_orders if o['status'] != 'cancelled'),
+            'total_orders': len(vendor_orders),
             'avg_order_value': 0.0,
             'top_products': []
         }
@@ -435,13 +451,16 @@ def vendor_dashboard():
 
     else:
         # Overview tab
+        total_p = stats['total_products']
         product_status = []
-        status_counts = {'Active': active_stats, 'Inactive': product_dao.count_vendor_products(vid, tab='inactive')}
-        status_counts['OutOfStock'] = out_of_stock
+        status_map = [
+            ('Active', stats['active_products'], 'bg-green-500'),
+            ('OutOfStock', stats['out_of_stock'], 'bg-yellow-500'),
+            ('Inactive', int(db_stats['inactive_products'] or 0), 'bg-gray-500')
+        ]
 
-        for status, count in status_counts.items():
-            percentage = (count / product_stats * 100) if product_stats > 0 else 0
-            color = 'bg-green-500' if status == 'Active' else 'bg-yellow-500' if status == 'OutOfStock' else 'bg-gray-500'
+        for status, count, color in status_map:
+            percentage = (count / total_p * 100) if total_p > 0 else 0
             product_status.append({
                 'status': status,
                 'count': count,
@@ -449,15 +468,17 @@ def vendor_dashboard():
                 'color': color
             })
 
-        low_stock_products = [p for p in my_products if 0 < p['stock'] < 10]
+        # Efficiently get low stock products
+        sql_low_stock = "SELECT Product_ID as id, Name as name, Stock as stock FROM Product WHERE Vendor_ID = %s AND Stock > 0 AND Stock < 10 LIMIT 5"
+        low_stock_products = sql_executor.execute_query(sql_low_stock, (vid,))
 
         recent_activity = [
             {
                 'icon': 'package',
                 'icon_bg': 'bg-blue-50',
                 'icon_color': 'text-blue-600',
-                'title': 'Real-time Data',
-                'description': 'Dashboard now synchronized with database',
+                'title': 'System Optimized',
+                'description': 'Database connection pooling and query optimization enabled',
                 'time': 'Just now'
             }
         ]
@@ -467,7 +488,7 @@ def vendor_dashboard():
                              vendor_status=vendor_status,
                              stats=stats,
                              product_status=product_status,
-                             low_stock_products=low_stock_products[:5],
+                             low_stock_products=low_stock_products,
                              recent_activity=recent_activity,
                              tab=tab)
 
@@ -802,11 +823,11 @@ def admin_dashboard():
     formatted_vendors = []
     for v in vendors:
         formatted_vendors.append({
-            'id': v[0],
-            'name': v[1],
-            'location': v[2],
-            'status': v[3],
-            'rating': float(v[4]) if v[4] is not None else 0.0
+            'id': v['Vendor_ID'],
+            'name': v['Store_Name'],
+            'location': v['Location'],
+            'status': v['Status'],
+            'rating': float(v['Rating']) if v['Rating'] is not None else 0.0
         })
         
     all_users = user_dao.get_all_users()

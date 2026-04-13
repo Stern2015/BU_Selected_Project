@@ -11,11 +11,12 @@ class SQL_Executor:
     def execute_query(self, sql, params=None):
         conn = self.conn_manager.get_connection()
         try:
+            conn.ping(reconnect=True)
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchall()
-        finally:
-            conn.close()
+        except Exception as e:
+            raise e
 
     '''
     execute SELECT statement and return ONE record
@@ -23,11 +24,12 @@ class SQL_Executor:
     def execute_query_one(self, sql, params=None):
         conn = self.conn_manager.get_connection()
         try:
+            conn.ping(reconnect=True)
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchone()
-        finally:
-            conn.close()
+        except Exception as e:
+            raise e
 
     '''
     execute_update to execute Insert/Delete/Update operations
@@ -35,6 +37,7 @@ class SQL_Executor:
     def execute_update(self, sql, params=None):
         conn = self.conn_manager.get_connection()
         try:
+            conn.ping(reconnect=True)
             with conn.cursor() as cursor:
                 affected_rows = cursor.execute(sql, params)
             conn.commit()
@@ -42,5 +45,3 @@ class SQL_Executor:
         except Exception as e:
             conn.rollback()
             raise e
-        finally:
-            conn.close()

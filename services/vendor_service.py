@@ -99,13 +99,13 @@ class VendorService:
             
             if result:
                 return {
-                    'vendor_id': result[0],
-                    'business_name': result[1],
-                    'geographical_presence': result[2],
-                    'status': result[3],
-                    'average_rating': float(result[4]),
-                    'created_at': result[5],
-                    'updated_at': result[6]
+                    'vendor_id': result['Vendor_ID'],
+                    'business_name': result['Store_Name'],
+                    'geographical_presence': result['Location'],
+                    'status': result['Status'],
+                    'average_rating': float(result['Rating']) if result['Rating'] else 0.0,
+                    'created_at': result['Created_At'],
+                    'updated_at': result['Updated_At']
                 }
             return None
             

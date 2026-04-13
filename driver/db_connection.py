@@ -26,8 +26,17 @@ class Connection_Manager:
                 'charset': config_parser['Database']['Charset'],
                 'cursorclass': pymysql.cursors.DictCursor
             }
+            # Persistent connection for development
+            cm._instance_._conn = None
 
         return cm._instance_
     
     def get_connection(self):
-        return pymysql.connect(**self.config)
+        if self._conn is None:
+            self._conn = pymysql.connect(**self.config)
+        else:
+            try:
+                self._conn.ping(reconnect=True)
+            except:
+                self._conn = pymysql.connect(**self.config)
+        return self._conn

@@ -10,12 +10,12 @@ class Transaction_Manager:
 
     def execute_transaction(self, operations):
         conn = self.conn_manager.get_connection()
+        cursor = conn.cursor()
 
         try:
-            with conn.cursor() as cursor:
-                conn.autocommit(False)
-                for sql, params in operations:
-                    cursor.execute(sql, params)
+            conn.autocommit(False)
+            for sql, params in operations:
+                cursor.execute(sql, params)
 
             conn.commit()
             return True
@@ -24,4 +24,4 @@ class Transaction_Manager:
             conn.rollback()
             return False
         finally:
-            conn.close()
+            cursor.close()

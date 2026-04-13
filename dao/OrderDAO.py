@@ -43,7 +43,8 @@ class OrderDAO(BaseDAO):
         total_amount = 0.0
         for sub_order_data in sub_orders_data:
             items = sub_order_data['items']
-            total_amount += sum(item['quantity'] * item['price_per_unit'] for item in items)
+            for item in items:
+                total_amount += float(item['quantity']) * float(item['price_per_unit'])
 
         actual_ops = []
 
@@ -61,7 +62,9 @@ class OrderDAO(BaseDAO):
             items = sub_order_data['items']
 
             # Calculate sub-total for current sub-order
-            sub_total = sum(item['quantity'] * item['price_per_unit'] for item in items)
+            sub_total = 0.0
+            for item in items:
+                sub_total += float(item['quantity']) * float(item['price_per_unit'])
 
             # Insert sub-order
             sub_order_sql = """
@@ -150,14 +153,16 @@ class OrderDAO(BaseDAO):
         if not order:
             return None
 
+        # order is already a dict because of DictCursor
+        order_details = order
         sub_orders = self.get_sub_orders_by_order_id(order_id)
-        order_details = dict(order)
         order_details['sub_orders'] = []
 
-        for sub_order in sub_orders:
-            sub_order_dict = dict(sub_order)
-            sub_order_dict['items'] = self.get_order_items_by_sub_order_id(sub_order['sub_order_id'])
-            order_details['sub_orders'].append(sub_order_dict)
+        if sub_orders:
+            for sub_order in sub_orders:
+                # Use a name that doesn't conflict with dict.items()
+                sub_order['order_items'] = self.get_order_items_by_sub_order_id(sub_order['sub_order_id'])
+                order_details['sub_orders'].append(sub_order)
 
         return order_details
 

@@ -8,14 +8,13 @@
         <div class="p-6">
             <ul class="divide-y divide-gray-200">
                 {% for item in cart_items %}
-                {% set p = get_product(item.product_id) %}
-                {% if p %}
+                {% set p = item.product %}
                 <li class="py-6 flex items-center justify-between">
                     <div class="flex items-center space-x-4">
                         <img src="{{ p.image }}" class="w-24 h-24 rounded-lg object-cover border border-gray-200" referrerpolicy="no-referrer">
                         <div>
                             <h3 class="text-lg font-medium text-gray-900"><a href="{{ url_for('product_detail', pid=p.id) }}" class="hover:text-indigo-600">{{ p.title }}</a></h3>
-                            <p class="text-sm text-gray-500 mt-1">Vendor: {{ get_vendor_name(p.vendor_id) }}</p>
+                            <p class="text-sm text-gray-500 mt-1">Vendor: {{ p.vendor_name }}</p>
                             <p class="text-lg font-bold text-indigo-600 mt-1">${{ p.price }}</p>
                         </div>
                     </div>
@@ -38,7 +37,6 @@
                         </form>
                     </div>
                 </li>
-                {% endif %}
                 {% endfor %}
             </ul>
             

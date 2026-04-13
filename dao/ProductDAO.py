@@ -300,3 +300,32 @@ class ProductDAO(BaseDAO):
         else:
             return 0
         return self.executor.execute_update(sql, (amount, product_id))
+
+    def get_products_by_ids(self, pids):
+        """Fetch multiple product details in one query."""
+        if not pids:
+            return []
+        
+        format_strings = ','.join(['%s'] * len(pids))
+        sql = f"""
+            SELECT p.Product_ID as id, p.Name as title, p.Price as price, 
+                   p.Image_URL as image, p.Vendor_ID as vendor_id, v.Store_Name as vendor_name
+            FROM Product p
+            JOIN Vendor v ON p.Vendor_ID = v.Vendor_ID
+            WHERE p.Product_ID IN ({format_strings})
+        """
+        return self.executor.execute_query(sql, tuple(pids))
+
+    def get_vendor_stats(self, vendor_id):
+        """Get aggregate stats for a vendor in one query."""
+        sql = """
+            SELECT 
+                COUNT(*) as total_products,
+                SUM(CASE WHEN Status = 'Active' THEN 1 ELSE 0 END) as active_products,
+                SUM(Stock) as total_stock,
+                SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
+                SUM(CASE WHEN Status = 'Inactive' THEN 1 ELSE 0 END) as inactive_products
+            FROM Product
+            WHERE Vendor_ID = %s
+        """
+        return self.executor.execute_query_one(sql, (vendor_id,))
