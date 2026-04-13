@@ -1,7 +1,4 @@
-try:
-    from dao.BaseDAO import BaseDAO
-except ImportError:
-    from BaseDAO import BaseDAO
+from dao.BaseDAO import BaseDAO
 
 import json
 
