@@ -5,6 +5,7 @@ from dao.ProductDAO import ProductDAO
 from dao.TagDAO import TagDAO
 from services.vendor_service import VendorService
 from services.order_service import OrderService
+from services.auth_service import Auth_Service
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
@@ -170,6 +171,7 @@ def products():
     )
 
 
+auth = Auth_Service()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -178,7 +180,13 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        user = next((u for u in DB['users'] if u['username'] == username and u['password'] == password), None)
+        ret = auth.verify_user_account(username, password)
+        if not ret:
+            flash('Invalid username or password')
+            return render_template('login.html', login_type=login_type)
+        
+        user = auth.get_user_info().get_dict()
+
         if user:
             if login_type == 'customer' and not has_role(user, ROLE_CUSTOMER):
                 flash('Please use the backend login for admin/vendor accounts.')

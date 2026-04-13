@@ -6,18 +6,16 @@ Implements CRUD operations and vendor-related queries
 
 from driver.sql_executor import SQL_Executor
 from driver.transaction_manager import Transaction_Manager
+from BaseDAO import BaseDAO
 
-
-class VendorDAO:
+class VendorDAO(BaseDAO):
     """
     DAO class for handling vendor-related database operations.
     Provides methods for creating, reading, updating, and deleting vendor records.
     """
     
     def __init__(self):
-        """Initialize DAO with SQL executor and transaction manager."""
-        self.executor = SQL_Executor()
-        self.tx_manager = Transaction_Manager()
+        super().__init__()
     
     # ===== CREATE OPERATIONS =====
     
