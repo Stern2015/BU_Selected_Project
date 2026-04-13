@@ -1,6 +1,8 @@
 -- Shop module database table structure
 -- This file contains table structures for products, tags, vendors, etc.
 
+-- CREATE SCHEMA `bu_selected` DEFAULT CHARACTER SET utf8mb4 ;
+
 -- If tables exist, drop them first (for development environment only)
 DROP TABLE IF EXISTS Rating;
 DROP TABLE IF EXISTS Tagging;
@@ -98,13 +100,23 @@ CREATE TABLE Tagging (
     UNIQUE KEY unique_product_position (Product_ID, Position)
 );
 
--- Insert sample categories
+-- Insert sample data
+
+INSERT INTO UserAccount (Username, PasswordHash, Phone_Number, Role_Bits) VALUES
+('Admin1', '123', '1300000000', 4),
+('User1', '123', '1300000000', 1),
+('User2', '123', '1300000000', 1),
+('Vendor1', '123', '1300000000', 2),
+('Vendor2', '123', '1300000000', 2);
+
+
 INSERT INTO Category (Name, Description) VALUES
 ('Electronics', 'Electronic devices and accessories'),
 ('Furniture', 'Home and office furniture'),
 ('Clothing', 'Apparel and fashion items'),
 ('Books', 'Books and publications'),
 ('General', 'General products');
+
 
 -- Create view: product details (including tags)
 CREATE VIEW Product_Detail AS

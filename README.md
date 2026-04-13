@@ -14,3 +14,9 @@ Layer 2 Business Implemention: services
 Layer 3 Data Access Layer: dao
 
 ```
+
+
+# DataBase
+```
+CREATE SCHEMA `bu_selected` DEFAULT CHARACTER SET utf8mb4 ;
+```
