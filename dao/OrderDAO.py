@@ -308,9 +308,13 @@ class OrderDAO(BaseDAO):
         sub_order_id = item['sub_order_id']
         item_price = item['total_price']
 
-        # Get parent order ID
-        sub_order_sql = "SELECT order_id FROM sub_orders WHERE sub_order_id = %s"
+        # Get sub-order to check shipping status
+        sub_order_sql = "SELECT order_id, shipping_status FROM sub_orders WHERE sub_order_id = %s"
         sub_order = self.executor.execute_query_one(sub_order_sql, (sub_order_id,))
+        
+        if not sub_order or sub_order['shipping_status'] != 'pending':
+            return False
+
         order_id = sub_order['order_id']
 
         # Update item status, adjust totals, and restore product stock

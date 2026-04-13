@@ -15,6 +15,7 @@ product_dao = ProductDAO()
 tag_dao = TagDAO()
 user_dao = UserDAO()
 vendor_service = VendorService()
+order_service = OrderService()
 sql_executor = SQL_Executor()
 
 # Role Bitmasks
@@ -806,20 +807,36 @@ def update_product_stock(product_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/vendor/order/<sub_id>/status', methods=['POST'])
+def update_sub_order_status(sub_id):
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        if new_status not in ['pending', 'shipped', 'delivered']:
+            return jsonify({'success': False, 'message': 'Invalid status'}), 400
+
+        # Use global order_service
+        order_service.order_dao.update_shipping_status(sub_id, new_status)
+        order_service.order_dao.update_sub_order_status(sub_id, new_status)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 @app.route('/vendor/transaction/<sub_id>/ship', methods=['POST'])
 def ship_order(sub_id):
     if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR): 
         return redirect(url_for('login', type='backend'))
-    
-    order_service = OrderService()
-    # In a real system, we'd have a specific ship_sub_order method
-    # For now, we use existing DAO method via service if available or direct SQL
-    sql = "UPDATE sub_orders SET shipping_status = 'Shipped', status = 'shipped' WHERE sub_order_id = %s AND merchant_id = %s"
-    sql_executor.execute_update(sql, (sub_id, session['user']['id']))
-    
+
+    # Use global order_service
+    order_service.order_dao.update_shipping_status(sub_id, 'shipped')
+    order_service.order_dao.update_sub_order_status(sub_id, 'shipped')
+
     flash('Order marked as shipped.')
     return redirect(url_for('vendor_dashboard', tab='orders'))
-
 # --- ADMIN ROUTES ---
 
 @app.route('/admin')

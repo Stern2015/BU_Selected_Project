@@ -409,9 +409,20 @@
                             {{ order.created_at }}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <a href="{{ url_for('order_detail', oid=order.order_id) }}" class="text-indigo-600 hover:text-indigo-900">
-                                View Details
-                            </a>
+                            <div class="flex flex-col space-y-2">
+                                <a href="{{ url_for('order_detail', oid=order.order_id) }}" class="text-indigo-600 hover:text-indigo-900">
+                                    View Details
+                                </a>
+                                
+                                <div class="flex items-center space-x-2">
+                                    <select onchange="updateLogisticsStatus('{{ order.sub_order_id }}', this.value)" 
+                                            class="text-xs border border-gray-300 rounded px-1 py-1 focus:ring-1 focus:ring-indigo-500">
+                                        <option value="pending" {% if order.shipping_status == 'pending' %}selected{% endif %}>Pending</option>
+                                        <option value="shipped" {% if order.shipping_status == 'shipped' %}selected{% endif %}>Shipped</option>
+                                        <option value="delivered" {% if order.shipping_status == 'delivered' %}selected{% endif %}>Delivered</option>
+                                    </select>
+                                </div>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -502,6 +513,35 @@
             modal.classList.add('hidden');
         }
     });
+
+    function updateLogisticsStatus(subOrderId, newStatus) {
+        if (!confirm(`Change logistics status to ${newStatus}?`)) {
+            location.reload(); // Reset select if cancelled
+            return;
+        }
+
+        fetch(`/vendor/order/${subOrderId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Failed to update status');
+                location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to update status');
+            location.reload();
+        });
+    }
 </script>
 
 <!-- Edit Vendor Information Modal -->
