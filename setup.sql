@@ -12,15 +12,24 @@ DROP TABLE IF EXISTS Product;
 DROP TABLE IF EXISTS Category;
 DROP TABLE IF EXISTS Vendor;
 DROP TABLE IF EXISTS Customer;
+DROP TABLE IF EXISTS Admins;
 DROP TABLE IF EXISTS UserAccount;
+
 
 -- UserAccount table
 CREATE TABLE UserAccount (
-    User_ID INT AUTO_INCREMENT PRIMARY KEY,
-    Username VARCHAR(50),
-    PasswordHash VARCHAR(255),
+    User_ID VARCHAR(50) PRIMARY KEY,
+    Username VARCHAR(50) UNIQUE NOT NULL,
+    PasswordHash VARCHAR(255) NOT NULL,
     Phone_Number VARCHAR(32),
     Role_Bits INT
+);
+
+-- Admin Table
+CREATE TABLE Admins (
+    Admin_ID VARCHAR(50) PRIMARY KEY,
+    Display_Name VARCHAR(50),
+    FOREIGN KEY (Admin_ID) REFERENCES UserAccount(User_ID)
 );
 
 -- Vendor table
@@ -31,17 +40,38 @@ CREATE TABLE Vendor (
     Status ENUM('Active', 'Inactive') DEFAULT 'Active',
     Rating DECIMAL(3, 2) DEFAULT 0.00,
     Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    Updated_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    Updated_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (Vendor_ID) REFERENCES UserAccount(User_ID)
 );
 
 -- Customer table
 CREATE TABLE Customer (
     User_ID VARCHAR(50) PRIMARY KEY,
-    Phone_number VARCHAR(50),
     Nick_name VARCHAR(255),
     Address VARCHAR(255),
-    Order_History TEXT
+    Order_History TEXT,
+    FOREIGN KEY (User_ID) REFERENCES UserAccount(User_ID)
 );
+
+-- Sample data 
+INSERT INTO UserAccount VALUES
+('u1', 'Admin1', '123', '1300000000', 4),
+('u2',' User1', '123', '1300000000', 1),
+('u3', 'User2', '123', '1300000000', 1),
+('u4', 'Vendor1', '123', '1300000000', 2),
+('u5', 'Vendor2', '123', '1300000000', 2);
+
+INSERT INTO Admins VALUES
+('u1', "王小二");
+
+INSERT INTO Vendor VALUES
+('u4', "Digital Store", 'Beijing', 'Active', 4.8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('u5', "Home Living", 'Shanghai', 'Active', 4.5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO Customer VALUES
+('u2', "悟空", "广东省深圳市", "history"),
+('u3', "猪八戒", "广东省广州市", "history");
+
 
 -- Rating table (customer rates vendor)
 CREATE TABLE Rating (
@@ -103,6 +133,7 @@ CREATE TABLE Tagging (
 
 -- Insert sample data
 
+<<<<<<< HEAD
 INSERT INTO UserAccount (Username, PasswordHash, Phone_Number, Role_Bits) VALUES
 ('Admin1', '123', '1300000000', 4),
 ('User1', '123', '1300000000', 1),
@@ -110,6 +141,8 @@ INSERT INTO UserAccount (Username, PasswordHash, Phone_Number, Role_Bits) VALUES
 ('Vendor1', '123', '1300000000', 2),
 ('Vendor2', '123', '1300000000', 2);
 
+=======
+>>>>>>> aefcee1 (refine SQL add sample data)
 INSERT INTO Category (Name, Description) VALUES
 ('Electronics', 'Electronic devices and accessories'),
 ('Furniture', 'Home and office furniture'),
