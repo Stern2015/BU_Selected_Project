@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """
 Product & Tag Service
 Handles business logic related to products and tags.
@@ -11,8 +10,6 @@ import uuid
 from datetime import datetime
 from driver.sql_executor import SQL_Executor
 
-=======
->>>>>>> f281e97 (minor changes)
 
 class ProductService:
     """Product service class for handling product-related operations"""
