@@ -9,6 +9,8 @@ from services.order_service import OrderService
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
 
+vendor_service = VendorService()
+
 # Role Bitmasks
 ROLE_CUSTOMER = 1
 ROLE_VENDOR = 2
@@ -39,6 +41,32 @@ DB = {
     'orders': [],
     'sub_orders': []
 }
+
+def _sync_vendor_cache_from_db():
+    vendors = []
+    for row in vendor_service.get_all_vendors():
+        vendors.append({
+            'id': row[0],
+            'name': row[1],
+            'location': row[2],
+            'status': row[3],
+            'rating': float(row[4]) if row[4] is not None else 0.0
+        })
+    DB['vendors'] = vendors
+
+def _upsert_vendor_cache(vendor_id, name=None, location=None, status=None, rating=None):
+    v = next((x for x in DB['vendors'] if x['id'] == vendor_id), None)
+    if not v:
+        v = {'id': vendor_id, 'name': name or '', 'location': location or '', 'status': status or 'Active', 'rating': rating or 0.0}
+        DB['vendors'].append(v)
+    if name is not None:
+        v['name'] = name
+    if location is not None:
+        v['location'] = location
+    if status is not None:
+        v['status'] = status
+    if rating is not None:
+        v['rating'] = float(rating)
 
 def get_vendor_name(vid):
     for v in DB['vendors']:
@@ -620,7 +648,6 @@ def vendor_dashboard_alt():
 @app.route('/vendor/onboard', methods=['POST'])
 def vendor_onboard():
     """POST /vendor/onboard - Vendor onboarding"""
-    # Authentication check
     if 'user' not in session or session.get('login_type') != 'backend':
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
@@ -640,29 +667,23 @@ def vendor_onboard():
         return redirect(request.referrer or url_for('index'))
     
     # Check if user is already a vendor
-    existing_vendor = next((v for v in DB['vendors'] if v['id'] == user_id), None)
-    if existing_vendor:
-        flash('You are already a vendor.')
-        return redirect(url_for('vendor_dashboard'))
-    
-    # Add vendor to in-memory database
     try:
-        DB['vendors'].append({
-            'id': user_id,
-            'name': business_name,
-            'rating': 0.0,
-            'location': geographical_presence,
-            'status': 'Active'
-        })
-        
-        # Update user role to include ROLE_VENDOR
+        result = vendor_service.onboard_new_vendor(
+            user_id=user_id,
+            business_name=business_name,
+            geographical_presence=geographical_presence
+        )
+        if not result.get('success'):
+            flash(result.get('message') or 'Failed to onboard vendor.')
+            return redirect(url_for('vendor_dashboard'))
+
         user = session['user']
         user['role'] |= ROLE_VENDOR
         session.modified = True
-        
-        flash(f'Vendor onboarded successfully: {business_name}')
+
+        _upsert_vendor_cache(user_id, name=business_name, location=geographical_presence, status='Active', rating=0.0)
+        flash(result.get('message') or f'Vendor onboarded successfully: {business_name}')
         return redirect(url_for('vendor_dashboard'))
-        
     except Exception as e:
         flash(f'Error onboarding vendor: {str(e)}')
         return redirect(request.referrer or url_for('index'))
@@ -671,7 +692,6 @@ def vendor_onboard():
 @app.route('/vendor/update', methods=['POST'])
 def vendor_update():
     """POST /vendor/update - Update vendor information"""
-    # Authentication and vendor role check
     if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
     
@@ -681,23 +701,52 @@ def vendor_update():
     business_name = request.form.get('business_name', '').strip()
     geographical_presence = request.form.get('geographical_presence', '').strip()
     
-    # Find and update vendor
-    vendor = next((v for v in DB['vendors'] if v['id'] == vid), None)
-    if not vendor:
-        return jsonify({'success': False, 'message': 'Vendor not found'}), 404
-    
-    # Update fields if provided
-    if business_name:
-        vendor['name'] = business_name
-    if geographical_presence:
-        vendor['location'] = geographical_presence
-    
-    flash('Vendor information updated successfully.')
+    if not business_name and not geographical_presence:
+        flash('No changes to update.')
+        return redirect(url_for('vendor_dashboard'))
+
+    result = vendor_service.update_vendor_info(
+        vendor_id=vid,
+        business_name=business_name if business_name else None,
+        geographical_presence=geographical_presence if geographical_presence else None
+    )
+
+    if not result.get('success'):
+        return jsonify({'success': False, 'message': result.get('message') or 'Update failed'}), 400
+
+    _upsert_vendor_cache(vid, name=business_name or None, location=geographical_presence or None)
+    flash(result.get('message') or 'Vendor information updated successfully.')
     
     # Check if request is AJAX
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': True, 'message': 'Vendor updated successfully'})
     
+    return redirect(url_for('vendor_dashboard'))
+
+
+@app.route('/vendor/update-info', methods=['POST'])
+def vendor_update_info():
+    # Kept for template compatibility
+    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
+        flash('Please log in as a vendor.')
+        return redirect(url_for('login', type='backend'))
+
+    vid = session['user']['id']
+    business_name = request.form.get('business_name', '').strip()
+    geographical_presence = request.form.get('geographical_presence', '').strip()
+
+    result = vendor_service.update_vendor_info(
+        vendor_id=vid,
+        business_name=business_name if business_name else None,
+        geographical_presence=geographical_presence if geographical_presence else None
+    )
+
+    if result.get('success'):
+        _upsert_vendor_cache(vid, name=business_name or None, location=geographical_presence or None)
+        flash(result.get('message') or 'Vendor information updated successfully.')
+    else:
+        flash(result.get('message') or 'Failed to update vendor information.')
+
     return redirect(url_for('vendor_dashboard'))
 
 
@@ -1054,6 +1103,10 @@ def ship_order(sub_id):
 @app.route('/admin')
 def admin_dashboard():
     if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_ADMIN): return redirect(url_for('login', type='backend'))
+    try:
+        _sync_vendor_cache_from_db()
+    except Exception:
+        pass
     available_users = [u for u in DB['users'] if not has_role(u, ROLE_VENDOR) and not has_role(u, ROLE_ADMIN)]
     return render_template('admin.html', vendors=DB['vendors'], available_users=available_users)
 
@@ -1066,10 +1119,16 @@ def save_vendor():
     user_id = request.form.get('user_id')
     
     if vid:
-        v = next((v for v in DB['vendors'] if v['id'] == vid), None)
-        if v:
-            v.update({'name': name, 'location': location})
+        result = vendor_service.update_vendor_info(
+            vendor_id=vid,
+            business_name=name if name else None,
+            geographical_presence=location if location else None
+        )
+        if result.get('success'):
+            _upsert_vendor_cache(vid, name=name or None, location=location or None)
             flash('Vendor updated.')
+        else:
+            flash(result.get('message') or 'Failed to update vendor.')
     else:
         if not user_id:
             flash('Please select a user to bind to the new vendor.')
@@ -1088,12 +1147,13 @@ def save_vendor():
             flash('User is already a vendor.')
             return redirect(url_for('admin_dashboard'))
             
-        DB['vendors'].append({
-            'id': user_id, 'name': name, 'location': location, 'rating': 0.0, 'status': 'Active'
-        })
-        
+        result = vendor_service.onboard_new_vendor(user_id=user_id, business_name=name, geographical_presence=location)
+        if not result.get('success'):
+            flash(result.get('message') or 'Failed to create vendor.')
+            return redirect(url_for('admin_dashboard'))
+
+        _upsert_vendor_cache(user_id, name=name, location=location, status='Active', rating=0.0)
         user['role'] |= ROLE_VENDOR
-            
         flash('Vendor added and bound to user.')
         
     return redirect(url_for('admin_dashboard'))
@@ -1101,9 +1161,24 @@ def save_vendor():
 @app.route('/admin/vendor/<vid>/toggle', methods=['POST'])
 def toggle_vendor(vid):
     if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_ADMIN): return redirect(url_for('login', type='backend'))
-    v = next((v for v in DB['vendors'] if v['id'] == vid), None)
-    if v:
-        v['status'] = 'Inactive' if v['status'] == 'Active' else 'Active'
+    current = None
+    try:
+        current = vendor_service.get_vendor_by_id(vid)
+    except Exception:
+        current = None
+
+    current_status = (current.get('status') if current else None) or next((x['status'] for x in DB['vendors'] if x['id'] == vid), None)
+    try:
+        if current_status == 'Active':
+            result = vendor_service.deactivate_vendor(vid)
+            if result.get('success'):
+                _upsert_vendor_cache(vid, status='Inactive')
+        else:
+            result = vendor_service.activate_vendor(vid)
+            if result.get('success'):
+                _upsert_vendor_cache(vid, status='Active')
+    except Exception as e:
+        flash(f'Failed to toggle vendor: {str(e)}')
     return redirect(url_for('admin_dashboard'))
 
 if __name__ == '__main__':
