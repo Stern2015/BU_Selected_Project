@@ -216,3 +216,34 @@ DELIMITER ;
 -- Create indexes to optimize query performance
 CREATE INDEX idx_product_search ON Product(Name, Category, Status);
 CREATE INDEX idx_vendor_product ON Product(Vendor_ID, Status, Created_At);
+
+
+USE bu_selected;
+
+CREATE TABLE IF NOT EXISTS `Order` (
+    Order_ID      VARCHAR(36)    PRIMARY KEY,
+    Customer_ID   VARCHAR(50)    NOT NULL,
+    Order_Date    DATETIME       NOT NULL,
+    Status        VARCHAR(20)    DEFAULT 'Pending',
+    Total_Payment DECIMAL(10,2)  NOT NULL,
+    FOREIGN KEY (Customer_ID) REFERENCES Customer(User_ID)
+);
+
+CREATE TABLE IF NOT EXISTS `Transaction` (
+    Transaction_ID VARCHAR(36)   PRIMARY KEY,
+    Order_ID       VARCHAR(36)   NOT NULL,
+    Vendor_ID      VARCHAR(50)   NOT NULL,
+    Payment_Amount DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (Order_ID)  REFERENCES `Order`(Order_ID),
+    FOREIGN KEY (Vendor_ID) REFERENCES Vendor(Vendor_ID)
+);
+
+CREATE TABLE IF NOT EXISTS Order_Items (
+    Transaction_ID VARCHAR(36)   NOT NULL,
+    Product_ID     VARCHAR(50)   NOT NULL,
+    Quantity       INT           NOT NULL,
+    Price          DECIMAL(10,2) NOT NULL,
+    PRIMARY KEY (Transaction_ID, Product_ID),
+    FOREIGN KEY (Transaction_ID) REFERENCES `Transaction`(Transaction_ID),
+    FOREIGN KEY (Product_ID)     REFERENCES Product(Product_ID)
+);
