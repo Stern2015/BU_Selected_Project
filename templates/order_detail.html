@@ -13,7 +13,7 @@
             <div class="flex flex-col sm:flex-row sm:space-x-6 text-sm">
                 <div>
                     <span class="text-gray-500 block text-xs uppercase tracking-wider">Order Placed</span>
-                    <span class="font-medium text-gray-900">{{ order.created_at }}</span>
+                    <span class="font-medium text-gray-900">{{ order.order_date }}</span>
                 </div>
                 <div>
                     <span class="text-gray-500 block text-xs uppercase tracking-wider">Total Amount</span>
@@ -21,20 +21,21 @@
                 </div>
                 <div>
                     <span class="text-gray-500 block text-xs uppercase tracking-wider">Order ID</span>
-                    <span class="font-medium text-gray-900">{{ order.id }}</span>
+                    <span class="font-medium text-gray-900">{{ order.order_id }}</span>
                 </div>
             </div>
             <div class="flex items-center space-x-4">
                 <span class="px-3 py-1 text-xs font-bold rounded-full 
-                    {% if order.status == 'Pending' %}bg-yellow-100 text-yellow-800
-                    {% elif order.status == 'Shipped' %}bg-blue-100 text-blue-800
-                    {% elif order.status == 'Cancelled' %}bg-red-100 text-red-800
+                    {% if order.status == 'pending' %}bg-yellow-100 text-yellow-800
+                    {% elif order.status == 'shipped' %}bg-blue-100 text-blue-800
+                    {% elif order.status == 'cancelled' %}bg-red-100 text-red-800
+                    {% elif order.status == 'completed' %}bg-green-100 text-green-800
                     {% else %}bg-gray-100 text-gray-800{% endif %}">
-                    {{ order.status }}
+                    {{ order.status|capitalize }}
                 </span>
                 
-                {% if order.status == 'Pending' %}
-                <form action="{{ url_for('cancel_order', oid=order.id) }}" method="POST" onsubmit="showConfirm(event, 'Are you sure you want to cancel this entire order?', 'Cancel Order');">
+                {% if order.status == 'pending' %}
+                <form action="{{ url_for('cancel_order', oid=order.order_id) }}" method="POST" onsubmit="showConfirm(event, 'Are you sure you want to cancel this entire order?', 'Cancel Order');">
                     <button type="submit" class="text-red-600 hover:text-red-800 text-sm font-medium flex items-center border border-red-200 bg-red-50 px-3 py-1.5 rounded-md hover:bg-red-100 transition-colors">
                         <i data-lucide="x-circle" class="h-4 w-4 mr-1"></i> Cancel Order
                     </button>
@@ -44,49 +45,61 @@
         </div>
         
         <div class="p-6">
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Shipping Address</h3>
+                <p class="text-gray-900">{{ order.shipping_address }}</p>
+            </div>
+
             <h2 class="text-lg font-bold text-gray-900 mb-4 border-b border-gray-100 pb-2">Sub-Orders (By Vendor)</h2>
             
             <div class="space-y-8">
-                {% for sub in sub_orders %}
-                {% if sub['items'] %}
+                {% for sub in order.sub_orders %}
                 <div class="border border-gray-200 rounded-lg overflow-hidden">
                     <div class="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                         <div class="flex items-center">
                             <i data-lucide="store" class="h-5 w-5 text-gray-400 mr-2"></i>
-                            <span class="font-bold text-gray-900">{{ get_vendor_name(sub.vendor_id) }}</span>
-                            <span class="ml-4 text-sm text-gray-500">Sub-Order: {{ sub.id }}</span>
+                            <span class="font-bold text-gray-900">{{ get_vendor_name(sub.merchant_id) }}</span>
+                            <span class="ml-4 text-sm text-gray-500">Sub-Order: {{ sub.sub_order_id }}</span>
                         </div>
                         <div class="flex space-x-2">
-                            <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">
-                                {{ sub.payment_status }}
+                            <span class="px-2 py-1 text-xs font-medium rounded 
+                                {% if sub.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                {% elif sub.status == 'shipped' %}bg-blue-100 text-blue-800
+                                {% elif sub.status == 'cancelled' %}bg-red-100 text-red-800
+                                {% elif sub.status == 'delivered' %}bg-green-100 text-green-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                Status: {{ sub.status|capitalize }}
                             </span>
                             <span class="px-2 py-1 text-xs font-medium rounded 
-                                {% if sub.logistics_status == 'Pending' %}bg-yellow-100 text-yellow-800
-                                {% elif sub.logistics_status == 'Shipped' %}bg-blue-100 text-blue-800
-                                {% elif sub.logistics_status == 'Cancelled' %}bg-red-100 text-red-800
+                                {% if sub.shipping_status == 'pending' %}bg-yellow-100 text-yellow-800
+                                {% elif sub.shipping_status == 'shipped' %}bg-blue-100 text-blue-800
+                                {% elif sub.shipping_status == 'delivered' %}bg-green-100 text-green-800
                                 {% else %}bg-gray-100 text-gray-800{% endif %}">
-                                Logistics: {{ sub.logistics_status }}
+                                Shipping: {{ sub.shipping_status|capitalize }}
                             </span>
                         </div>
                     </div>
                     
                     <ul class="divide-y divide-gray-100 p-4">
-                        {% for item in sub['items'] %}
-                        {% set p = get_product(item.product_id) %}
-                        {% if p %}
-                        <li class="py-4 flex justify-between items-center">
+                        {% for item in sub.items %}
+                        <li class="py-4 flex justify-between items-center {% if item.item_status == 'removed' %}opacity-50 grayscale{% endif %}">
                             <div class="flex items-center space-x-4">
-                                <img src="{{ p.image }}" class="w-16 h-16 rounded object-cover border border-gray-200" referrerpolicy="no-referrer">
+                                <img src="{{ item.product_image }}" class="w-16 h-16 rounded object-cover border border-gray-200" referrerpolicy="no-referrer">
                                 <div>
-                                    <h4 class="text-sm font-medium text-gray-900">{{ p.title }}</h4>
-                                    <p class="text-sm text-gray-500">Qty: {{ item.quantity }} × ${{ item.price }}</p>
+                                    <h4 class="text-sm font-medium text-gray-900">{{ item.product_name }}</h4>
+                                    <p class="text-sm text-gray-500">
+                                        Qty: {{ item.quantity }} × ${{ item.price_per_unit }}
+                                        {% if item.item_status == 'removed' %}
+                                        <span class="ml-2 text-red-500 font-bold">(Removed)</span>
+                                        {% endif %}
+                                    </p>
                                 </div>
                             </div>
                             <div class="flex items-center space-x-4">
-                                <span class="text-sm font-bold text-gray-900">${{ item.quantity * item.price }}</span>
+                                <span class="text-sm font-bold text-gray-900">${{ item.total_price }}</span>
                                 
-                                {% if order.status == 'Pending' and sub.logistics_status == 'Pending' %}
-                                <form action="{{ url_for('remove_order_item', oid=order.id, sub_id=sub.id, pid=p.id) }}" method="POST" onsubmit="showConfirm(event, 'Remove this item from the order?', 'Remove Item');">
+                                {% if order.status == 'pending' and sub.shipping_status == 'pending' and item.item_status == 'active' %}
+                                <form action="{{ url_for('remove_order_item', oid=order.order_id, item_id=item.order_item_id) }}" method="POST" onsubmit="showConfirm(event, 'Remove this item from the order?', 'Remove Item');">
                                     <button type="submit" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Remove Item">
                                         <i data-lucide="trash-2" class="h-4 w-4"></i>
                                     </button>
@@ -94,15 +107,13 @@
                                 {% endif %}
                             </div>
                         </li>
-                        {% endif %}
                         {% endfor %}
                     </ul>
                     <div class="bg-gray-50 px-4 py-3 border-t border-gray-200 text-right">
                         <span class="text-sm text-gray-500">Sub-Order Total:</span>
-                        <span class="text-lg font-bold text-gray-900 ml-2">${{ sub.amount }}</span>
+                        <span class="text-lg font-bold text-gray-900 ml-2">${{ sub.sub_total_amount }}</span>
                     </div>
                 </div>
-                {% endif %}
                 {% endfor %}
             </div>
         </div>

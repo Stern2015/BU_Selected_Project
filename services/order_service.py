@@ -2,92 +2,63 @@
 Order & Transaction Service
 Handles business logic related to orders and transactions
 """
-import uuid
-from datetime import datetime
-from dao.CustomerDAO import CustomerDAO
-from driver.sql_executor import SQL_Executor
+from dao.OrderDAO import OrderDAO
+from typing import List, Dict, Optional, Union
 
 class OrderService:
     def __init__(self):
-        self.dao = CustomerDAO()
-        self.executor = SQL_Executor()
+        self.order_dao = OrderDAO()
 
-    def create_order(self, customer_id, cart_items, get_product_fn):
+    def create_order(self, customer_id: str, shipping_address: str, cart_items: List[Dict], get_product_fn) -> Optional[str]:
         """
-        结账核心逻辑：
-        1. 生成主订单
-        2. 按商户拆分，每个商户生成一条 Transaction
-        3. 每个商品生成一条 Order_Items
-        返回 order_id
+        Create a new order by grouping items by merchant.
         """
-        order_id = 'ORD-' + str(uuid.uuid4())[:8].upper()
-        total_amount = 0
-        sub_orders_map = {}
-
-        # 按商户分组，计算总金额
+        # Group items by merchant
+        merchant_items = {}
         for item in cart_items:
-            p = get_product_fn(item['product_id'])
-            if not p:
+            product = get_product_fn(item['product_id'])
+            if not product:
                 continue
-            total_amount += p['price'] * item['quantity']
-            vid = p['vendor_id']
-            if vid not in sub_orders_map:
-                sub_orders_map[vid] = []
-            sub_orders_map[vid].append({
-                'product_id': p['id'],
+            
+            merchant_id = product['vendor_id']
+            if merchant_id not in merchant_items:
+                merchant_items[merchant_id] = []
+            
+            merchant_items[merchant_id].append({
+                'product_id': item['product_id'],
                 'quantity': item['quantity'],
-                'price': p['price']
+                'price_per_unit': float(product['price'])
             })
+        
+        # Format for OrderDAO
+        sub_orders_data = []
+        for merchant_id, items in merchant_items.items():
+            sub_orders_data.append({
+                'merchant_id': merchant_id,
+                'items': items
+            })
+        
+        if not sub_orders_data:
+            return None
+            
+        return self.order_dao.create_order(customer_id, shipping_address, sub_orders_data)
 
-        # 写主订单到数据库
-        self._create_order_db(order_id, customer_id, total_amount)
+    def get_customer_orders(self, customer_id: str) -> List[Dict]:
+        """Get all orders for a customer."""
+        return self.order_dao.get_customer_orders(customer_id)
 
-        # 为每个商户写 Transaction + Order_Items
-        for vid, items in sub_orders_map.items():
-            txn_id = 'TXN-' + str(uuid.uuid4())[:8].upper()
-            txn_amount = sum(i['price'] * i['quantity'] for i in items)
-            self._create_transaction_db(txn_id, order_id, vid, txn_amount)
-            for item in items:
-                self._create_order_item_db(txn_id, item['product_id'],
-                                           item['quantity'], item['price'])
+    def get_order_details(self, order_id: str) -> Optional[Dict]:
+        """Get full details of an order."""
+        return self.order_dao.get_full_order_details(order_id)
 
-        return order_id, total_amount, sub_orders_map
+    def cancel_order(self, order_id: str) -> bool:
+        """Cancel an order before shipping."""
+        return self.order_dao.cancel_order(order_id)
 
-    def _create_order_db(self, order_id, customer_id, total_payment):
-        sql = """
-            INSERT INTO `Order`
-                (Order_ID, Customer_ID, Order_Date, Status, Total_Payment)
-            VALUES (%s, %s, %s, %s, %s)
-        """
-        self.executor.execute_update(
-            sql, (order_id, customer_id, datetime.now(), 'Pending', total_payment)
-        )
+    def remove_item_from_order(self, order_item_id: str) -> bool:
+        """Remove a specific item from an order."""
+        return self.order_dao.remove_order_item(order_item_id)
 
-    def _create_transaction_db(self, txn_id, order_id, vendor_id, amount):
-        sql = """
-            INSERT INTO `Transaction`
-                (Transaction_ID, Order_ID, Vendor_ID, Payment_Amount)
-            VALUES (%s, %s, %s, %s)
-        """
-        self.executor.execute_update(sql, (txn_id, order_id, vendor_id, amount))
-
-    def _create_order_item_db(self, txn_id, product_id, quantity, price):
-        sql = """
-            INSERT INTO Order_Items
-                (Transaction_ID, Product_ID, Quantity, Price)
-            VALUES (%s, %s, %s, %s)
-        """
-        self.executor.execute_update(sql, (txn_id, product_id, quantity, price))
-
-    def get_transactions_by_order(self, order_id):
-        sql = "SELECT * FROM `Transaction` WHERE Order_ID = %s"
-        return self.executor.execute_query(sql, (order_id,))
-
-    def get_items_by_transaction(self, transaction_id):
-        sql = """
-            SELECT oi.*, p.Name, p.Image_URL
-            FROM Order_Items oi
-            JOIN Product p ON oi.Product_ID = p.Product_ID
-            WHERE oi.Transaction_ID = %s
-        """
-        return self.executor.execute_query(sql, (transaction_id,))
+    def get_vendor_orders(self, vendor_id: str) -> List[Dict]:
+        """Get all sub-orders for a vendor."""
+        return self.order_dao.get_vendor_sub_orders(vendor_id)

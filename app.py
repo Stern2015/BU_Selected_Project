@@ -349,7 +349,7 @@ def checkout():
             flash(f"Sorry, {p['title']} only has {p['stock']} left in stock.")
             return redirect(url_for('view_cart'))
 
-    # ★ 写入 MySQL
+    # ★ Write to MySQL via OrderService
     try:
         order_service = OrderService()
         order_id, total_amount, sub_orders_map = order_service.create_order(
