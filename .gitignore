@@ -6,4 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
-# config.ini
+# config.ini__pycache__/
+test.py
