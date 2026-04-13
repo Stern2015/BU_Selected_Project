@@ -18,25 +18,25 @@ def has_role(user, role_flag):
 
 # In-memory Database
 DB = {
-    'users': [
-        {'id': 'u1', 'username': 'admin', 'password': '123', 'role': ROLE_ADMIN | ROLE_CUSTOMER},
-        {'id': 'u2', 'username': 'vendor1', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
-        {'id': 'u3', 'username': 'vendor2', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
-        {'id': 'u4', 'username': 'customer1', 'password': '123', 'role': ROLE_CUSTOMER},
-    ],
-    'vendors': [
-        {'id': 'u2', 'name': 'Digital Store', 'rating': 4.8, 'location': 'Beijing', 'status': 'Active'},
-        {'id': 'u3', 'name': 'Home Living', 'rating': 4.5, 'location': 'Shanghai', 'status': 'Active'},
-    ],
-    'categories': ['Electronics', 'Furniture', 'Clothing', 'Books'],
-    'products': [
-        {'id': 'p1', 'title': 'High-Performance Laptop', 'price': 5999, 'category': 'Electronics', 'tags': ['Computer', 'Tech'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/laptop/300/200', 'stock': 50, 'status': 'Active'},
-        {'id': 'p2', 'title': 'Ergonomic Office Chair', 'price': 899, 'category': 'Furniture', 'tags': ['Office', 'Ergonomic'], 'vendor_id': 'u3', 'image': 'https://picsum.photos/seed/chair/300/200', 'stock': 120, 'status': 'Active'},
-        {'id': 'p3', 'title': 'Wireless Headphones', 'price': 1299, 'category': 'Electronics', 'tags': ['Audio'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/headphone/300/200', 'stock': 200, 'status': 'Active'},
-    ],
-    'carts': {},  # user_id -> [{'product_id': 'p1', 'quantity': 1}]
-    'orders': [],
-    'sub_orders': []
+    # 'users': [
+    #     {'id': 'u1', 'username': 'admin', 'password': '123', 'role': ROLE_ADMIN | ROLE_CUSTOMER},
+    #     {'id': 'u2', 'username': 'vendor1', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
+    #     {'id': 'u3', 'username': 'vendor2', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
+    #     {'id': 'u4', 'username': 'customer1', 'password': '123', 'role': ROLE_CUSTOMER},
+    # ],
+    # 'vendors': [
+    #     {'id': 'u2', 'name': 'Digital Store', 'rating': 4.8, 'location': 'Beijing', 'status': 'Active'},
+    #     {'id': 'u3', 'name': 'Home Living', 'rating': 4.5, 'location': 'Shanghai', 'status': 'Active'},
+    # ],
+    # 'categories': ['Electronics', 'Furniture', 'Clothing', 'Books'],
+    # 'products': [
+    #     {'id': 'p1', 'title': 'High-Performance Laptop', 'price': 5999, 'category': 'Electronics', 'tags': ['Computer', 'Tech'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/laptop/300/200', 'stock': 50, 'status': 'Active'},
+    #     {'id': 'p2', 'title': 'Ergonomic Office Chair', 'price': 899, 'category': 'Furniture', 'tags': ['Office', 'Ergonomic'], 'vendor_id': 'u3', 'image': 'https://picsum.photos/seed/chair/300/200', 'stock': 120, 'status': 'Active'},
+    #     {'id': 'p3', 'title': 'Wireless Headphones', 'price': 1299, 'category': 'Electronics', 'tags': ['Audio'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/headphone/300/200', 'stock': 200, 'status': 'Active'},
+    # ],
+    # 'carts': {},  # user_id -> [{'product_id': 'p1', 'quantity': 1}]
+    # 'orders': [],
+    # 'sub_orders': []
 }
 
 def _sync_vendor_cache_from_db():

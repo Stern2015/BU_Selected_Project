@@ -110,6 +110,11 @@ CREATE TABLE Product (
     INDEX idx_status (Status)
 );
 
+INSERT INTO Product VALUES
+('p1', 'High-Performance Laptop', "", 5999, 50, 'Electronics', 'https://picsum.photos/seed/laptop/300/200', 'u2', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p2', 'Ergonomic Office Chair', "", 899, 50, 'Electronics', 'https://picsum.photos/seed/chair/300/200', 'u3', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p3', 'Wireless Headphones', "", 1299, 50, 'Electronics', 'https://picsum.photos/seed/headphone/300/200', 'u2', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
 -- Tag table
 CREATE TABLE Tag (
     Tag_ID INT AUTO_INCREMENT PRIMARY KEY,
