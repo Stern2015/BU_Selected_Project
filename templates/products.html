@@ -9,16 +9,20 @@
 
     <!-- Search and filter bar -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <form method="GET" action="{{ url_for('products') }}" class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <!-- Keyword search -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+        <form method="GET" action="{{ url_for('products') }}" class="space-y-6">
+            <!-- Row 1: Search -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div class="relative">
                     <input type="text" name="q" value="{{ request.args.get('q', '') }}"
-                           placeholder="Product name or description..."
-                           class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                           placeholder="Search by name, category, or tags..."
+                           class="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-lg">
+                    <i data-lucide="search" class="h-5 w-5 absolute left-3 top-3.5 text-gray-400"></i>
                 </div>
+            </div>
 
+            <!-- Row 2: Category and Price -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <!-- Category filter -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -35,28 +39,26 @@
                 <!-- Price range -->
                 <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
-                    <div class="flex items-center space-x-2">
-                        <input type="number" name="min_price" value="{{ request.args.get('min_price', '') }}"
-                               placeholder="Min" step="0.01" min="0"
-                               class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <div class="flex items-center space-x-3">
+                        <div class="relative flex-1">
+                            <span class="absolute left-3 top-2 text-gray-400">$</span>
+                            <input type="number" name="min_price" value="{{ request.args.get('min_price', '') }}"
+                                   placeholder="Min" step="0.01" min="0"
+                                   class="w-full border border-gray-300 rounded-lg pl-7 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
                         <span class="text-gray-400">to</span>
-                        <input type="number" name="max_price" value="{{ request.args.get('max_price', '') }}"
-                               placeholder="Max" step="0.01" min="0"
-                               class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <div class="relative flex-1">
+                            <span class="absolute left-3 top-2 text-gray-400">$</span>
+                            <input type="number" name="max_price" value="{{ request.args.get('max_price', '') }}"
+                                   placeholder="Max" step="0.01" min="0"
+                                   class="w-full border border-gray-300 rounded-lg pl-7 pr-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Tag search -->
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
-                <input type="text" name="tags" value="{{ request.args.get('tags', '') }}"
-                       placeholder="e.g., electronics, wireless, premium"
-                       class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-            </div>
-
             <!-- Action buttons -->
-            <div class="flex justify-between items-center pt-2">
+            <div class="flex justify-between items-center pt-4 border-t border-gray-100">
                 <div class="text-sm text-gray-500">
                     {% if total_products %}
                     Found {{ total_products }} product{% if total_products != 1 %}s{% endif %}
@@ -83,9 +85,9 @@
         <h2 class="text-lg font-semibold text-gray-900 mb-3">Popular Tags</h2>
         <div class="flex flex-wrap gap-2">
             {% for tag in popular_tags %}
-            <a href="{{ url_for('products', tags=tag.name) }}"
+            <a href="{{ url_for('products', q=tag.name) }}"
                class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors
-                      {% if tag.name in request.args.get('tags', '') %}
+                      {% if tag.name|lower == request.args.get('q', '')|lower %}
                       bg-indigo-100 text-indigo-800 border border-indigo-200
                       {% else %}
                       bg-gray-100 text-gray-800 hover:bg-gray-200
