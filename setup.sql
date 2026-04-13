@@ -20,8 +20,6 @@ DROP TABLE IF EXISTS Customer;
 DROP TABLE IF EXISTS Admins;
 DROP TABLE IF EXISTS UserAccount;
 
-
-
 -- UserAccount table
 CREATE TABLE UserAccount (
     User_ID VARCHAR(50) PRIMARY KEY,
@@ -116,6 +114,7 @@ CREATE TABLE Product (
     INDEX idx_status (Status)
 );
 
+-- sample data
 INSERT INTO Product VALUES
 ('p1', 'High-Performance Laptop', "", 5999, 50, 'Electronics', 'https://picsum.photos/seed/laptop/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('p2', 'Ergonomic Office Chair', "", 899, 50, 'Electronics', 'https://picsum.photos/seed/chair/300/200', 'u5', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
@@ -287,52 +286,52 @@ CREATE INDEX idx_vendor_product ON Product(Vendor_ID, Status, Created_At);
 
 -- Main Order Table
 CREATE TABLE orders (
-    order_id VARCHAR(36) PRIMARY KEY COMMENT 'Primary order unique identifier (UUID)',
-    customer_id VARCHAR(50) NOT NULL COMMENT 'Customer ID (foreign key to Customer table)',
-    order_date DATETIME NOT NULL COMMENT 'Order creation date and time',
-    total_amount DECIMAL(10,2) NOT NULL COMMENT 'Total order amount (sum of all sub-order amounts)',
-    status VARCHAR(50) NOT NULL COMMENT 'Order status: pending, processing, shipped, cancelled, completed',
-    shipping_address TEXT NOT NULL COMMENT 'Shipping address for the order',
-    payment_status VARCHAR(50) NOT NULL COMMENT 'Payment status: paid, unpaid, refunded',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation time',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update time',
+    order_id VARCHAR(36) PRIMARY KEY,
+    customer_id VARCHAR(50) NOT NULL,
+    order_date DATETIME NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    shipping_address TEXT NOT NULL,
+    payment_status VARCHAR(50) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_customer_id (customer_id),
     INDEX idx_order_date (order_date),
     INDEX idx_order_status (status),
     FOREIGN KEY (customer_id) REFERENCES Customer(User_ID)
 ) COMMENT 'Main order table';
 
--- Sub Order Table
+-- Sub Order Table(Transaction)
 CREATE TABLE sub_orders (
-    sub_order_id VARCHAR(36) PRIMARY KEY COMMENT 'Sub-order unique identifier (UUID)',
-    order_id VARCHAR(36) NOT NULL COMMENT 'Main order ID (foreign key to orders table)',
-    merchant_id VARCHAR(50) NOT NULL COMMENT 'Merchant ID (foreign key to Vendor table)',
-    sub_total_amount DECIMAL(10,2) NOT NULL COMMENT 'Sub-order total amount (sum of products under this merchant)',
-    status VARCHAR(50) NOT NULL COMMENT 'Sub-order status: pending, processing, shipped, cancelled, delivered',
-    shipping_status VARCHAR(50) NOT NULL COMMENT 'Shipping status: pending, shipped, delivered',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation time',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update time',
+    sub_order_id VARCHAR(36) PRIMARY KEY,
+    order_id VARCHAR(36) NOT NULL,
+    merchant_id VARCHAR(50) NOT NULL,
+    sub_total_amount DECIMAL(10,2) NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    shipping_status VARCHAR(50) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_order_id (order_id),
     INDEX idx_merchant_id (merchant_id),
     INDEX idx_sub_order_status (status),
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (merchant_id) REFERENCES Vendor(Vendor_ID)
-) COMMENT 'Sub-order table';
+);
 
 -- Order Items Table
 CREATE TABLE order_items (
-    order_item_id VARCHAR(36) PRIMARY KEY COMMENT 'Order item unique identifier (UUID)',
-    sub_order_id VARCHAR(36) NOT NULL COMMENT 'Sub-order ID (foreign key to sub_orders table)',
-    product_id VARCHAR(50) NOT NULL COMMENT 'Product ID (foreign key to Product table)',
-    quantity INT NOT NULL COMMENT 'Purchased quantity of the product',
-    price_per_unit DECIMAL(10,2) NOT NULL COMMENT 'Unit price at the time of order',
-    total_price DECIMAL(10,2) NOT NULL COMMENT 'Total price for this item (quantity * price_per_unit)',
-    item_status VARCHAR(50) NOT NULL COMMENT 'Item status: active, removed, returned',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation time',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update time',
+    order_item_id VARCHAR(36) PRIMARY KEY,
+    sub_order_id VARCHAR(36) NOT NULL,
+    product_id VARCHAR(50) NOT NULL,
+    quantity INT NOT NULL,
+    price_per_unit DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
+    item_status VARCHAR(50) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_sub_order_id (sub_order_id),
     INDEX idx_product_id (product_id),
     INDEX idx_item_status (item_status),
     FOREIGN KEY (sub_order_id) REFERENCES sub_orders(sub_order_id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (product_id) REFERENCES Product(Product_ID)
-) COMMENT 'Order item details table';
+);
