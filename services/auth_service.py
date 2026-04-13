@@ -34,6 +34,10 @@ class User:
     
     def is_vendor(self):
         return self.role & ROLE_VENDOR
+    
+    def get_dict(self):
+        return {'id': self.id, 'username': self.username, 'password': self.password, 'role': self.role, "phone_number": self.phone_number}
+
 
 
 class Auth_Service:
@@ -41,7 +45,7 @@ class Auth_Service:
         self.sql_executor = SQL_Executor()
 
     def verify_user_account(self, username, password):
-        password_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        password_hash = password  ## direct use raw password
         userdao = UserDAO()
         result = userdao.get_user_by_username(username)
         if result:
@@ -60,15 +64,6 @@ class Auth_Service:
     
     @staticmethod
     def check_vendor_role(user):
-        """
-        Check if user has vendor role
-        
-        Args:
-            user (dict): User object/dictionary with 'role' key
-        
-        Returns:
-            bool: True if user has vendor role, False otherwise
-        """
         if not user:
             return False
         
@@ -77,15 +72,6 @@ class Auth_Service:
     
     @staticmethod
     def check_admin_role(user):
-        """
-        Check if user has admin role
-        
-        Args:
-            user (dict): User object/dictionary with 'role' key
-        
-        Returns:
-            bool: True if user has admin role, False otherwise
-        """
         if not user:
             return False
         
@@ -94,15 +80,6 @@ class Auth_Service:
     
     @staticmethod
     def check_customer_role(user):
-        """
-        Check if user has customer role
-        
-        Args:
-            user (dict): User object/dictionary with 'role' key
-        
-        Returns:
-            bool: True if user has customer role, False otherwise
-        """
         if not user:
             return False
         
@@ -111,16 +88,6 @@ class Auth_Service:
     
     @staticmethod
     def has_role(user, role_flag):
-        """
-        Generic role checker
-        
-        Args:
-            user (dict): User object/dictionary with 'role' key
-            role_flag (int): Role bitmask to check
-        
-        Returns:
-            bool: True if user has the specified role, False otherwise
-        """
         if not user:
             return False
         
