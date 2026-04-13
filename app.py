@@ -1,12 +1,18 @@
 import uuid
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from driver.sql_executor import SQL_Executor
+from dao.ProductDAO import ProductDAO
+from dao.TagDAO import TagDAO
 from services.vendor_service import VendorService
 from services.order_service import OrderService
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_for_bu_selected'
 
+product_dao = ProductDAO()
+tag_dao = TagDAO()
 vendor_service = VendorService()
+sql_executor = SQL_Executor()
 
 # Role Bitmasks
 ROLE_CUSTOMER = 1
@@ -18,25 +24,25 @@ def has_role(user, role_flag):
 
 # In-memory Database
 DB = {
-    # 'users': [
-    #     {'id': 'u1', 'username': 'admin', 'password': '123', 'role': ROLE_ADMIN | ROLE_CUSTOMER},
-    #     {'id': 'u2', 'username': 'vendor1', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
-    #     {'id': 'u3', 'username': 'vendor2', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
-    #     {'id': 'u4', 'username': 'customer1', 'password': '123', 'role': ROLE_CUSTOMER},
-    # ],
-    # 'vendors': [
-    #     {'id': 'u2', 'name': 'Digital Store', 'rating': 4.8, 'location': 'Beijing', 'status': 'Active'},
-    #     {'id': 'u3', 'name': 'Home Living', 'rating': 4.5, 'location': 'Shanghai', 'status': 'Active'},
-    # ],
-    # 'categories': ['Electronics', 'Furniture', 'Clothing', 'Books'],
-    # 'products': [
-    #     {'id': 'p1', 'title': 'High-Performance Laptop', 'price': 5999, 'category': 'Electronics', 'tags': ['Computer', 'Tech'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/laptop/300/200', 'stock': 50, 'status': 'Active'},
-    #     {'id': 'p2', 'title': 'Ergonomic Office Chair', 'price': 899, 'category': 'Furniture', 'tags': ['Office', 'Ergonomic'], 'vendor_id': 'u3', 'image': 'https://picsum.photos/seed/chair/300/200', 'stock': 120, 'status': 'Active'},
-    #     {'id': 'p3', 'title': 'Wireless Headphones', 'price': 1299, 'category': 'Electronics', 'tags': ['Audio'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/headphone/300/200', 'stock': 200, 'status': 'Active'},
-    # ],
-    # 'carts': {},  # user_id -> [{'product_id': 'p1', 'quantity': 1}]
-    # 'orders': [],
-    # 'sub_orders': []
+#     'users': [
+#         {'id': 'u1', 'username': 'admin', 'password': '123', 'role': ROLE_ADMIN | ROLE_CUSTOMER},
+#         {'id': 'u2', 'username': 'vendor1', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
+#         {'id': 'u3', 'username': 'vendor2', 'password': '123', 'role': ROLE_VENDOR | ROLE_CUSTOMER},
+#         {'id': 'u4', 'username': 'customer1', 'password': '123', 'role': ROLE_CUSTOMER},
+#     ],
+#     'vendors': [
+#         {'id': 'u2', 'name': 'Digital Store', 'rating': 4.8, 'location': 'Beijing', 'status': 'Active'},
+#         {'id': 'u3', 'name': 'Home Living', 'rating': 4.5, 'location': 'Shanghai', 'status': 'Active'},
+#     ],
+#     'categories': ['Electronics', 'Furniture', 'Clothing', 'Books'],
+#     'products': [
+#         {'id': 'p1', 'title': 'High-Performance Laptop', 'price': 5999, 'category': 'Electronics', 'tags': ['Computer', 'Tech'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/laptop/300/200', 'stock': 50, 'status': 'Active'},
+#         {'id': 'p2', 'title': 'Ergonomic Office Chair', 'price': 899, 'category': 'Furniture', 'tags': ['Office', 'Ergonomic'], 'vendor_id': 'u3', 'image': 'https://picsum.photos/seed/chair/300/200', 'stock': 120, 'status': 'Active'},
+#         {'id': 'p3', 'title': 'Wireless Headphones', 'price': 1299, 'category': 'Electronics', 'tags': ['Audio'], 'vendor_id': 'u2', 'image': 'https://picsum.photos/seed/headphone/300/200', 'stock': 200, 'status': 'Active'},
+#     ],
+#     'carts': {},  # user_id -> [{'product_id': 'p1', 'quantity': 1}]
+#     'orders': [],
+#     'sub_orders': []
 }
 
 def _sync_vendor_cache_from_db():
@@ -66,14 +72,11 @@ def _upsert_vendor_cache(vendor_id, name=None, location=None, status=None, ratin
         v['rating'] = float(rating)
 
 def get_vendor_name(vid):
-    for v in DB['vendors']:
-        if v['id'] == vid: return v['name']
-    return 'Unknown'
+    return product_dao.get_vendor_name(vid)
 
 def get_product(pid):
-    for p in DB['products']:
-        if p['id'] == pid: return p
-    return None
+    return product_dao.get_public_product_detail(pid)
+
 
 @app.context_processor
 def inject_globals():
@@ -95,120 +98,78 @@ def index():
 
 @app.route('/product/<pid>')
 def product_detail(pid):
-    p = get_product(pid)
-    if not p: return "Product not found", 404
+    product = product_dao.get_public_product_detail(pid)
+    if not product:
+        return "Product not found", 404
 
-    v = next((v for v in DB['vendors'] if v['id'] == p['vendor_id']), None)
-    if not v or v['status'] != 'Active':
-        flash('This product is currently unavailable.')
-        return redirect(url_for('index'))
+    return render_template('product.html', product=product)
 
-    return render_template('product.html', product=p)
 
 @app.route('/products')
 def products():
-    """Product browsing page"""
-    # Get query parameters
     keyword = request.args.get('q', '').strip()
     category = request.args.get('category', '').strip()
-    min_price = request.args.get('min_price')
-    max_price = request.args.get('max_price')
-    tags = request.args.get('tags', '').strip()
-    page = int(request.args.get('page', 1))
+    min_price_raw = request.args.get('min_price', '').strip()
+    max_price_raw = request.args.get('max_price', '').strip()
+    tags_raw = request.args.get('tags', '').strip()
 
-    # Convert price parameters
-    min_price = float(min_price) if min_price and min_price.replace('.', '', 1).isdigit() else None
-    max_price = float(max_price) if max_price and max_price.replace('.', '', 1).isdigit() else None
+    try:
+        page = max(int(request.args.get('page', 1)), 1)
+    except (TypeError, ValueError):
+        page = 1
 
-    # Get product data (currently using in-memory database)
-    filtered_products = []
-    for p in DB['products']:
-        if p['status'] != 'Active':
-            continue
+    min_price = float(min_price_raw) if min_price_raw else None
+    max_price = float(max_price_raw) if max_price_raw else None
+    tag_list = [tag.strip() for tag in tags_raw.split(',') if tag.strip()]
 
-        # Check if vendor is active
-        v = next((v for v in DB['vendors'] if v['id'] == p['vendor_id']), None)
-        if not v or v['status'] != 'Active':
-            continue
-
-        # Keyword filtering
-        if keyword and keyword.lower() not in p['title'].lower():
-            continue
-
-        # Category filtering
-        if category and p['category'] != category:
-            continue
-
-        # Price filtering
-        if min_price is not None and p['price'] < min_price:
-            continue
-        if max_price is not None and p['price'] > max_price:
-            continue
-
-        # Tag filtering
-        if tags:
-            tag_list = [t.strip().lower() for t in tags.split(',')]
-            product_tags = [t.lower() for t in p.get('tags', [])]
-            if not any(tag in product_tags for tag in tag_list):
-                continue
-
-        # Format product data
-        product_data = {
-            'id': p['id'],
-            'name': p['title'],
-            'description': '',
-            'price': p['price'],
-            'stock': p['stock'],
-            'category': p['category'],
-            'image_url': p['image'],
-            'vendor_id': p['vendor_id'],
-            'status': p['status'],
-            'rating': p.get('rating', 0.0),
-            'store_name': get_vendor_name(p['vendor_id']),
-            'tags': [{'name': tag} for tag in p.get('tags', [])]
-        }
-
-        # Add status classes
-        if product_data['stock'] == 0:
-            product_data['status_class'] = 'bg-yellow-100 text-yellow-800'
-            product_data['status_label'] = 'Out of Stock'
-        else:
-            product_data['status_class'] = 'bg-green-100 text-green-800'
-            product_data['status_label'] = 'Active'
-
-        product_data['stock_status'] = 'Out of Stock' if product_data['stock'] == 0 else 'In Stock'
-        product_data['stock_class'] = 'text-red-500 font-bold' if product_data['stock'] == 0 else 'text-green-500'
-        product_data['price_formatted'] = f"${product_data['price']:.2f}"
-        product_data['tag_names'] = [tag['name'] for tag in product_data['tags']]
-
-        filtered_products.append(product_data)
-
-    # Pagination
     page_size = 20
-    total_products = len(filtered_products)
-    total_pages = (total_products + page_size - 1) // page_size
-    start_idx = (page - 1) * page_size
-    end_idx = min(start_idx + page_size, total_products)
-    paginated_products = filtered_products[start_idx:end_idx]
+    offset = (page - 1) * page_size
 
-    # Get popular tags (simulated)
-    popular_tags = []
-    tag_counts = {}
-    for p in DB['products']:
-        for tag in p.get('tags', []):
-            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    if tag_list and not keyword and not category and min_price is None and max_price is None:
+        products = tag_dao.get_products_by_tags(
+            tag_names=tag_list,
+            operator='OR',
+            limit=page_size,
+            offset=offset
+        )
+        total_products = tag_dao.count_products_by_tags(
+            tag_names=tag_list,
+            operator='OR'
+        )
+    else:
+        products = product_dao.list_public_products(
+            keyword=keyword or None,
+            category=category or None,
+            min_price=min_price,
+            max_price=max_price,
+            tags=tag_list or None,
+            limit=page_size,
+            offset=offset
+        )
+        total_products = product_dao.count_public_products(
+            keyword=keyword or None,
+            category=category or None,
+            min_price=min_price,
+            max_price=max_price,
+            tags=tag_list or None
+        )
 
-    for tag, count in list(tag_counts.items())[:20]:
-        popular_tags.append({'name': tag, 'usage_count': count})
+    categories = product_dao.get_all_categories()
+    popular_tags = tag_dao.get_popular_tags(limit=20)
+    total_pages = (total_products + page_size - 1) // page_size if total_products else 0
 
-    return render_template('products.html',
-                         products=paginated_products,
-                         categories=DB['categories'],
-                         popular_tags=popular_tags,
-                         total_products=total_products,
-                         page=page,
-                         total_pages=total_pages,
-                         request=request)
+    return render_template(
+        'products.html',
+        products=products,
+        categories=categories,
+        popular_tags=popular_tags,
+        total_products=total_products,
+        page=page,
+        total_pages=total_pages,
+        request=request
+    )
+
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

@@ -2,6 +2,11 @@
 -- This file contains table structures for products, tags, vendors, etc.
 
 -- If tables exist, drop them first (for development environment only)
+DROP VIEW IF EXISTS Product_Detail;
+DROP PROCEDURE IF EXISTS AddProductWithTags;
+DROP FUNCTION IF EXISTS CheckProductOwnership;
+DROP TRIGGER IF EXISTS UpdateProductStatusOnStockChange;
+
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS sub_orders;
 DROP TABLE IF EXISTS orders;
@@ -14,6 +19,7 @@ DROP TABLE IF EXISTS Vendor;
 DROP TABLE IF EXISTS Customer;
 DROP TABLE IF EXISTS Admins;
 DROP TABLE IF EXISTS UserAccount;
+
 
 
 -- UserAccount table
@@ -111,9 +117,9 @@ CREATE TABLE Product (
 );
 
 INSERT INTO Product VALUES
-('p1', 'High-Performance Laptop', "", 5999, 50, 'Electronics', 'https://picsum.photos/seed/laptop/300/200', 'u2', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('p2', 'Ergonomic Office Chair', "", 899, 50, 'Electronics', 'https://picsum.photos/seed/chair/300/200', 'u3', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('p3', 'Wireless Headphones', "", 1299, 50, 'Electronics', 'https://picsum.photos/seed/headphone/300/200', 'u2', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('p1', 'High-Performance Laptop', "", 5999, 50, 'Electronics', 'https://picsum.photos/seed/laptop/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p2', 'Ergonomic Office Chair', "", 899, 50, 'Electronics', 'https://picsum.photos/seed/chair/300/200', 'u5', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p3', 'Wireless Headphones', "", 1299, 50, 'Electronics', 'https://picsum.photos/seed/headphone/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Tag table
 CREATE TABLE Tag (
@@ -135,6 +141,27 @@ CREATE TABLE Tagging (
     INDEX idx_tag (Tag_ID),
     UNIQUE KEY unique_product_position (Product_ID, Position)
 );
+
+INSERT INTO Tag (Name) VALUES
+('Computer'),
+('Tech'),
+('Office'),
+('Ergonomic'),
+('Audio');
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p1', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p1', Tag_ID, 2 FROM Tag WHERE Name = 'Tech';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p2', Tag_ID, 1 FROM Tag WHERE Name = 'Office';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p2', Tag_ID, 2 FROM Tag WHERE Name = 'Ergonomic';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p3', Tag_ID, 1 FROM Tag WHERE Name = 'Audio';
+
 
 -- Insert sample data
 
