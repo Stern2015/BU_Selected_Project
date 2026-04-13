@@ -20,3 +20,21 @@ class ProductService:
 
     def get_popular_tags(self, limit=20):
         return self.tag_dao.get_popular_tags(limit)
+
+    def list_vendor_products(self, **kwargs):
+        return self.product_dao.list_vendor_products(**kwargs)
+
+    def count_vendor_products(self, **kwargs):
+        return self.product_dao.count_vendor_products(**kwargs)
+
+    def add_product(self, **kwargs):
+        return self.product_dao.add_product(**kwargs)
+
+    def update_product(self, **kwargs):
+        return self.product_dao.update_product(**kwargs)
+
+    def toggle_product_status(self, product_id):
+        return self.product_dao.toggle_status(product_id)
+
+    def update_product_stock(self, **kwargs):
+        return self.product_dao.update_stock(**kwargs)

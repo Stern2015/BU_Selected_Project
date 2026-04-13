@@ -30,7 +30,7 @@ class User:
         return self.role
     
     def is_admin(self):
-        return self.role & ROLE_CUSTOMER
+        return self.role & ROLE_ADMIN
     
     def is_vendor(self):
         return self.role & ROLE_VENDOR
@@ -49,7 +49,7 @@ class Auth_Service:
         userdao = UserDAO()
         result = userdao.get_user_by_username(username)
         if result:
-            if result[2] == password_hash:
+            if result['PasswordHash'] == password_hash:
                 return True
         return False
     
@@ -57,7 +57,13 @@ class Auth_Service:
         userdao = UserDAO()
         result = userdao.get_user_by_username(username)
         if result:
-            user = User(result[0], result[1], result[2], result[3], result[4])
+            user = User(
+                result['User_ID'], 
+                result['Username'], 
+                result['PasswordHash'], 
+                result['Phone_Number'], 
+                result['Role_Bits']
+            )
             return user
         
         return None

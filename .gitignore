@@ -8,3 +8,4 @@ coverage/
 !.env.example
 # config.ini__pycache__/
 test.py
+*.pyc

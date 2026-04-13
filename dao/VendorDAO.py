@@ -6,7 +6,7 @@ Implements CRUD operations and vendor-related queries
 
 from driver.sql_executor import SQL_Executor
 from driver.transaction_manager import Transaction_Manager
-from BaseDAO import BaseDAO
+from dao.BaseDAO import BaseDAO
 
 class VendorDAO(BaseDAO):
     """
