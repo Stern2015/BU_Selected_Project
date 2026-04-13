@@ -181,20 +181,21 @@ class OrderDAO(BaseDAO):
 
     def get_vendor_sub_orders(self, merchant_id: str) -> List[Dict]:
         """
-        Get all sub-orders belonging to a specific merchant, including item count.
+        Get all sub-orders belonging to a specific merchant, including item count and customer name.
         
         Args:
             merchant_id: ID of the merchant/vendor
             
         Returns:
-            List of sub-order dicts with an additional 'item_count' field
+            List of sub-order dicts with an additional 'item_count' and 'customer_name' fields
         """
         sql = """
             SELECT so.*, 
                    (SELECT COUNT(*) FROM order_items WHERE sub_order_id = so.sub_order_id) as item_count,
-                   o.customer_id
+                   u.Username as customer_name
             FROM sub_orders so
             JOIN orders o ON so.order_id = o.order_id
+            JOIN UserAccount u ON o.customer_id = u.User_ID
             WHERE so.merchant_id = %s 
             ORDER BY so.created_at DESC
         """

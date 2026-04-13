@@ -3,9 +3,15 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-6 flex items-center justify-between">
         <h1 class="text-3xl font-bold text-gray-900">Order Details</h1>
+        {% if session.get('login_type') == 'backend' %}
+        <a href="{{ url_for('vendor_dashboard', tab='orders') }}" class="text-indigo-600 hover:text-indigo-800 flex items-center font-medium">
+            <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i> Back to Dashboard
+        </a>
+        {% else %}
         <a href="{{ url_for('order_list') }}" class="text-indigo-600 hover:text-indigo-800 flex items-center font-medium">
             <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i> Back to Orders
         </a>
+        {% endif %}
     </div>
 
     <div class="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden mb-8">

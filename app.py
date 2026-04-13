@@ -333,8 +333,8 @@ def order_list():
 
 @app.route('/orders/<oid>')
 def order_detail(oid):
-    if 'user' not in session or session.get('login_type') != 'customer': 
-        return redirect(url_for('login', type='customer'))
+    if 'user' not in session: 
+        return redirect(url_for('login'))
     
     # Get from MySQL
     order_service = OrderService()
@@ -342,6 +342,31 @@ def order_detail(oid):
     if not order: 
         return "Order not found", 404
         
+    user = session['user']
+    login_type = session.get('login_type')
+
+    # 1. Admin: can see everything
+    if has_role(user, ROLE_ADMIN):
+        return render_template('order_detail.html', order=order)
+
+    # 2. Backend / Vendor View
+    if login_type == 'backend' and has_role(user, ROLE_VENDOR):
+        # Filter sub_orders: only keep items belonging to this vendor
+        original_count = len(order.get('sub_orders', []))
+        order['sub_orders'] = [so for so in order.get('sub_orders', []) if so['merchant_id'] == user['id']]
+        
+        # If this vendor has no sub-orders in this main order, deny access
+        if not order['sub_orders'] and original_count > 0:
+            flash("Permission denied: No items from your store in this order.")
+            return redirect(url_for('vendor_dashboard'))
+            
+        return render_template('order_detail.html', order=order)
+
+    # 3. Customer View
+    if order['customer_id'] != user['id']:
+        flash("Permission denied.")
+        return redirect(url_for('index'))
+            
     return render_template('order_detail.html', order=order)
 
 @app.route('/orders/<oid>/cancel', methods=['POST'])
