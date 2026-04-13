@@ -251,35 +251,95 @@ class ProductDAO(BaseDAO):
         return int(result["total"] or 0) if result else 0
 
     def add_product(self, product_id, name, description, price, stock, category, image_url, vendor_id, tags_text):
-        """Add a new product with tags using the stored procedure."""
-        sql = "CALL AddProductWithTags(%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        params = (product_id, name, description, price, stock, category, image_url, vendor_id, tags_text)
-        return self.executor.execute_update(sql, params)
+        """Add a new product with tags using a robust transaction."""
+        operations = []
+        
+        # 1. Add product insert operation
+        sql_product = """
+            INSERT INTO Product (Product_ID, Name, Description, Price, Stock, Category, Image_URL, Vendor_ID, Status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Active')
+        """
+        params_product = (product_id, name, description, price, stock, category, image_url, vendor_id)
+        
+        # We'll use a manual transaction approach to handle the dynamic Tag IDs
+        conn = self.executor.conn_manager.get_connection()
+        cursor = conn.cursor()
+        try:
+            conn.ping(reconnect=True)
+            conn.autocommit(False)
+            
+            # Insert product
+            cursor.execute(sql_product, params_product)
+            
+            # Process tags
+            if tags_text:
+                tag_list = [t.strip() for t in tags_text.split(',') if t.strip()][:3]
+                for i, tag_name in enumerate(tag_list):
+                    # Ensure tag exists
+                    cursor.execute("INSERT IGNORE INTO Tag (Name) VALUES (%s)", (tag_name,))
+                    # Get ID
+                    cursor.execute("SELECT Tag_ID FROM Tag WHERE Name = %s", (tag_name,))
+                    row = cursor.fetchone()
+                    if row:
+                        tag_id = row['Tag_ID']
+                        # Link tag to product
+                        cursor.execute(
+                            "INSERT INTO Tagging (Product_ID, Tag_ID, Position) VALUES (%s, %s, %s)",
+                            (product_id, tag_id, i + 1)
+                        )
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in add_product transaction: {e}")
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
 
     def update_product(self, product_id, name, description, price, stock, category, image_url, tags_text, status):
-        """Update existing product details and tags."""
-        # 1. Update basic info
-        sql_update = """
-            UPDATE Product SET 
-                Name = %s, Description = %s, Price = %s, Stock = %s, 
-                Category = %s, Image_URL = %s, Status = %s, Updated_At = NOW()
-            WHERE Product_ID = %s
-        """
-        params_update = (name, description, price, stock, category, image_url, status, product_id)
-        self.executor.execute_update(sql_update, params_update)
+        """Update existing product details and tags using a single transaction."""
+        conn = self.executor.conn_manager.get_connection()
+        cursor = conn.cursor()
+        try:
+            conn.ping(reconnect=True)
+            conn.autocommit(False)
 
-        # 2. Update tags (simplistic approach: remove and re-add)
-        self.executor.execute_update("DELETE FROM Tagging WHERE Product_ID = %s", (product_id,))
-        
-        tag_list = [t.strip() for t in tags_text.split(',') if t.strip()][:3]
-        for i, tag_name in enumerate(tag_list):
-            self.executor.execute_update("INSERT IGNORE INTO Tag (Name) VALUES (%s)", (tag_name,))
-            tag_id_row = self.executor.execute_query_one("SELECT Tag_ID FROM Tag WHERE Name = %s", (tag_name,))
-            if tag_id_row:
-                self.executor.execute_update(
-                    "INSERT INTO Tagging (Product_ID, Tag_ID, Position) VALUES (%s, %s, %s)",
-                    (product_id, tag_id_row['Tag_ID'], i + 1)
-                )
+            # 1. Update basic info
+            sql_update = """
+                UPDATE Product SET 
+                    Name = %s, Description = %s, Price = %s, Stock = %s, 
+                    Category = %s, Image_URL = %s, Status = %s, Updated_At = NOW()
+                WHERE Product_ID = %s
+            """
+            params_update = (name, description, price, stock, category, image_url, status, product_id)
+            cursor.execute(sql_update, params_update)
+
+            # 2. Update tags: remove and re-add
+            cursor.execute("DELETE FROM Tagging WHERE Product_ID = %s", (product_id,))
+            
+            if tags_text:
+                tag_list = [t.strip() for t in tags_text.split(',') if t.strip()][:3]
+                for i, tag_name in enumerate(tag_list):
+                    cursor.execute("INSERT IGNORE INTO Tag (Name) VALUES (%s)", (tag_name,))
+                    cursor.execute("SELECT Tag_ID FROM Tag WHERE Name = %s", (tag_name,))
+                    row = cursor.fetchone()
+                    if row:
+                        cursor.execute(
+                            "INSERT INTO Tagging (Product_ID, Tag_ID, Position) VALUES (%s, %s, %s)",
+                            (product_id, row['Tag_ID'], i + 1)
+                        )
+            
+            conn.commit()
+            return True
+        except Exception as e:
+            conn.rollback()
+            print(f"Error in update_product transaction: {e}")
+            raise e
+        finally:
+            cursor.close()
+            conn.close()
 
     def toggle_status(self, product_id):
         """Toggle product status between Active and Inactive."""
@@ -292,11 +352,24 @@ class ProductDAO(BaseDAO):
         return self.executor.execute_update(sql, (product_id,))
 
     def update_stock(self, product_id, amount, action):
-        """Update product stock quantity."""
+        """Update product stock quantity and automatically manage Status."""
         if action == 'increase':
-            sql = "UPDATE Product SET Stock = Stock + %s, Updated_At = NOW() WHERE Product_ID = %s"
+            sql = """
+                UPDATE Product 
+                SET Stock = Stock + %s, 
+                    Status = CASE WHEN Status = 'OutOfStock' THEN 'Active' ELSE Status END,
+                    Updated_At = NOW() 
+                WHERE Product_ID = %s
+            """
         elif action == 'decrease':
-            sql = "UPDATE Product SET Stock = GREATEST(0, Stock - %s), Updated_At = NOW() WHERE Product_ID = %s"
+            sql = """
+                UPDATE Product 
+                SET Stock = GREATEST(0, Stock - %s), 
+                    Status = CASE WHEN Stock - %s <= 0 AND Status = 'Active' THEN 'OutOfStock' ELSE Status END,
+                    Updated_At = NOW() 
+                WHERE Product_ID = %s
+            """
+            return self.executor.execute_update(sql, (amount, amount, product_id))
         else:
             return 0
         return self.executor.execute_update(sql, (amount, product_id))

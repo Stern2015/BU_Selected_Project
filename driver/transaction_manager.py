@@ -25,3 +25,4 @@ class Transaction_Manager:
             return False
         finally:
             cursor.close()
+            conn.close()

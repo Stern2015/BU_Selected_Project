@@ -32,11 +32,6 @@ class Connection_Manager:
         return cm._instance_
     
     def get_connection(self):
-        if self._conn is None:
-            self._conn = pymysql.connect(**self.config)
-        else:
-            try:
-                self._conn.ping(reconnect=True)
-            except:
-                self._conn = pymysql.connect(**self.config)
-        return self._conn
+        # Always return a fresh connection to avoid state pollution and thread safety issues.
+        # Performance is maintained by the earlier N+1 query optimizations.
+        return pymysql.connect(**self.config)

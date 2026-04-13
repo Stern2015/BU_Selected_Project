@@ -52,13 +52,6 @@
 
         <!-- 操作按钮 -->
         <div class="flex space-x-3">
-            {% if tab == 'inventory' %}
-            <button onclick="openBulkStockModal()"
-                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center">
-                <i data-lucide="package-plus" class="h-4 w-4 mr-2"></i>
-                Bulk Update
-            </button>
-            {% endif %}
             <button onclick="openAddProductModal()"
                     class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium flex items-center">
                 <i data-lucide="plus" class="h-4 w-4 mr-2"></i>
@@ -67,36 +60,11 @@
         </div>
     </div>
 
-    <!-- 批量操作栏（仅库存标签显示） -->
-    {% if tab == 'inventory' and products %}
-    <div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center">
-                <i data-lucide="info" class="h-5 w-5 text-blue-600 mr-2"></i>
-                <span class="text-sm text-blue-700">Select products to update stock in bulk</span>
-            </div>
-            <div class="flex space-x-2">
-                <button onclick="selectAllProducts()" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                    Select All
-                </button>
-                <button onclick="deselectAllProducts()" class="text-sm text-gray-600 hover:text-gray-800 font-medium ml-2">
-                    Deselect All
-                </button>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
     <!-- 产品表格 -->
     <div class="bg-white shadow-sm overflow-hidden sm:rounded-xl border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
-                    {% if tab == 'inventory' %}
-                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-12">
-                        <input type="checkbox" id="select-all" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    </th>
-                    {% endif %}
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Product</th>
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
                     <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Stock</th>
@@ -107,13 +75,16 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200" id="products-table-body">
                 {% for product in products %}
-                <tr class="hover:bg-gray-50 product-row" data-id="{{ product.id }}" data-name="{{ product.name }}" data-category="{{ product.category }}">
-                    {% if tab == 'inventory' %}
-                    <td class="px-6 py-4 whitespace-nowrap">
-                        <input type="checkbox" name="selected_products" value="{{ product.id }}"
-                               class="product-checkbox rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                    </td>
-                    {% endif %}
+                <tr class="hover:bg-gray-50 product-row" 
+                    data-id="{{ product.id }}" 
+                    data-name="{{ product.name }}" 
+                    data-category="{{ product.category }}"
+                    data-price="{{ product.price }}"
+                    data-stock="{{ product.stock }}"
+                    data-description="{{ product.description }}"
+                    data-image="{{ product.image_url }}"
+                    data-status="{{ product.status }}"
+                    data-tags="{% for t in product.tags %}{{ t.name }}{% if not loop.last %}, {% endif %}{% endfor %}">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <img src="{{ product.image_url or 'https://picsum.photos/seed/product/100/100' }}"
@@ -366,58 +337,6 @@
     </div>
 </div>
 
-<!-- 批量库存更新模态框 -->
-{% if tab == 'inventory' %}
-<div id="bulk-stock-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Bulk Stock Update</h3>
-                <button onclick="closeBulkStockModal()" class="text-gray-400 hover:text-gray-500">
-                    <i data-lucide="x" class="h-5 w-5"></i>
-                </button>
-            </div>
-            <form id="bulk-stock-form" action="{{ url_for('bulk_update_stock') }}" method="POST">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Action</label>
-                        <select name="action" id="bulk-action" required
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="increase">Increase Stock</option>
-                            <option value="decrease">Decrease Stock</option>
-                            <option value="set">Set Stock to Specific Value</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" id="bulk-amount-label">Amount</label>
-                        <input type="number" name="amount" id="bulk-amount" min="1" required
-                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div id="bulk-set-value" class="hidden">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Set Stock To</label>
-                        <input type="number" name="set_value" id="bulk-set-value-input" min="0"
-                               class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                    <div class="text-sm text-gray-500">
-                        <span id="selected-count">0</span> products selected
-                    </div>
-                </div>
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="closeBulkStockModal()"
-                            class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
-                        Cancel
-                    </button>
-                    <button type="submit"
-                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
-                        Update Stock
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 <script>
 // 初始化图标
 lucide.createIcons();
@@ -438,9 +357,8 @@ function openAddProductModal() {
 }
 
 function editProduct(productId) {
-    // 这里应该通过AJAX获取产品数据
-    // 暂时重定向到带参数的URL
-    window.location.href = `{{ url_for('vendor_products') }}?edit=${productId}`;
+    // 直接打开模态框，不再重定向
+    openEditModalWithId(productId);
 }
 
 function closeModal() {
@@ -472,9 +390,11 @@ document.getElementById('search-input').addEventListener('input', function(e) {
     filterProducts(searchTerm);
 });
 
-document.getElementById('category-filter').addEventListener('change', function(e) {
-    filterProductsByCategory(e.target.value);
-});
+if (document.getElementById('category-filter')) {
+    document.getElementById('category-filter').addEventListener('change', function(e) {
+        filterProductsByCategory(e.target.value);
+    });
+}
 
 function filterProducts(searchTerm) {
     const rows = document.querySelectorAll('.product-row');
@@ -510,7 +430,6 @@ function decreaseStock(productId, productName) {
 }
 
 function updateStock(productId, action, amount) {
-    // 这里应该通过AJAX更新库存
     fetch(`/vendor/product/${productId}/stock`, {
         method: 'POST',
         headers: {
@@ -532,97 +451,36 @@ function updateStock(productId, action, amount) {
     });
 }
 
-// 批量操作功能
-function selectAllProducts() {
-    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-        checkbox.checked = true;
-    });
-    updateSelectedCount();
-}
-
-function deselectAllProducts() {
-    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    updateSelectedCount();
-}
-
-function updateSelectedCount() {
-    const selected = document.querySelectorAll('.product-checkbox:checked').length;
-    document.getElementById('selected-count').textContent = selected;
-}
-
-document.getElementById('select-all').addEventListener('change', function(e) {
-    document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-        checkbox.checked = e.target.checked;
-    });
-    updateSelectedCount();
-});
-
-document.querySelectorAll('.product-checkbox').forEach(checkbox => {
-    checkbox.addEventListener('change', updateSelectedCount);
-});
-
-// 批量库存模态框
-function openBulkStockModal() {
-    const selectedCount = document.querySelectorAll('.product-checkbox:checked').length;
-    if (selectedCount === 0) {
-        alert('Please select at least one product');
-        return;
-    }
-
-    document.getElementById('selected-count').textContent = selectedCount;
-    document.getElementById('bulk-stock-modal').classList.remove('hidden');
-}
-
-function closeBulkStockModal() {
-    document.getElementById('bulk-stock-modal').classList.add('hidden');
-}
-
-document.getElementById('bulk-action').addEventListener('change', function(e) {
-    const setValueDiv = document.getElementById('bulk-set-value');
-    const amountLabel = document.getElementById('bulk-amount-label');
-
-    if (e.target.value === 'set') {
-        setValueDiv.classList.remove('hidden');
-        amountLabel.textContent = 'Current Stock';
-    } else {
-        setValueDiv.classList.add('hidden');
-        amountLabel.textContent = 'Amount';
-    }
-});
-
-// 表单验证
-document.getElementById('product-form').addEventListener('submit', function(e) {
-    const tagsInput = document.getElementById('product-tags');
-    const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-
-    if (tags.length > 3) {
-        e.preventDefault();
-        alert('Maximum 3 tags allowed');
-        return;
-    }
-
-    // 验证价格和库存
-    const price = parseFloat(document.getElementById('product-price').value);
-    const stock = parseInt(document.getElementById('product-stock').value);
-
-    if (price < 0) {
-        e.preventDefault();
-        alert('Price must be non-negative');
-        return;
-    }
-
-    if (stock < 0) {
-        e.preventDefault();
-        alert('Stock must be non-negative');
-        return;
-    }
-});
-
-// 页面加载时更新选中计数
+// 页面加载时更新选中计数，并检查是否有编辑参数
 document.addEventListener('DOMContentLoaded', function() {
-    updateSelectedCount();
+    // 检查URL参数是否有edit (保留 deep-linking 支持)
+    const urlParams = new URLSearchParams(window.location.search);
+    const editId = urlParams.get('edit');
+    if (editId) {
+        openEditModalWithId(editId);
+    }
 });
+
+function openEditModalWithId(productId) {
+    const row = document.querySelector(`.product-row[data-id="${productId}"]`);
+    if (!row) {
+        console.error("Product row not found in current page");
+        return;
+    }
+
+    // 从 data 属性读取数据，不再依赖表格列索引
+    document.getElementById('product-id').value = productId;
+    document.getElementById('product-name').value = row.getAttribute('data-name');
+    document.getElementById('product-category').value = row.getAttribute('data-category');
+    document.getElementById('product-price').value = row.getAttribute('data-price');
+    document.getElementById('product-stock').value = row.getAttribute('data-stock');
+    document.getElementById('product-description').value = row.getAttribute('data-description');
+    document.getElementById('product-image-url').value = row.getAttribute('data-image');
+    document.getElementById('product-status').value = row.getAttribute('data-status');
+    document.getElementById('product-tags').value = row.getAttribute('data-tags');
+    
+    document.getElementById('modal-title').innerText = 'Edit Product';
+    document.getElementById('product-modal').classList.remove('hidden');
+}
 </script>
 {% endblock %}

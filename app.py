@@ -778,6 +778,8 @@ def update_product_stock(product_id):
         return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
     vid = session['user']['id']
+    
+    # Secure check: ensure product belongs to vendor
     sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
     row = sql_executor.execute_query_one(sql, (product_id,))
 
@@ -794,34 +796,15 @@ def update_product_stock(product_id):
 
         product_dao.update_stock(product_id, amount, action)
         
-        # Get updated info
-        new_row = sql_executor.execute_query_one("SELECT Stock, Status FROM Product WHERE Product_ID = %s", (product_id,))
-        return jsonify({'success': True, 'stock': new_row['Stock'], 'status': new_row['Status']})
+        # Get updated info with explicit aliases to avoid case-sensitivity issues
+        new_row = sql_executor.execute_query_one("SELECT Stock as stock, Status as status FROM Product WHERE Product_ID = %s", (product_id,))
+        return jsonify({
+            'success': True, 
+            'stock': int(new_row['stock']), 
+            'status': str(new_row['status'])
+        })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
-
-@app.route('/vendor/products/bulk-stock', methods=['POST'])
-def bulk_update_stock():
-    """Bulk update stock"""
-    if 'user' not in session or session.get('login_type') != 'backend' or not has_role(session['user'], ROLE_VENDOR):
-        return redirect(url_for('login', type='backend'))
-
-    vid = session['user']['id']
-    product_ids = request.form.getlist('product_ids')
-    action = request.form.get('action')
-    amount = int(request.form.get('amount', 0))
-
-    updated_count = 0
-    for pid in product_ids:
-        # Check ownership
-        sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
-        row = sql_executor.execute_query_one(sql, (pid,))
-        if row and row['Vendor_ID'] == vid:
-            product_dao.update_stock(pid, amount, action)
-            updated_count += 1
-
-    flash(f'Updated stock for {updated_count} product(s).')
-    return redirect(url_for('vendor_products', tab='inventory'))
 
 @app.route('/vendor/transaction/<sub_id>/ship', methods=['POST'])
 def ship_order(sub_id):
