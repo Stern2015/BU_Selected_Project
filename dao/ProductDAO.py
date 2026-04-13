@@ -304,7 +304,6 @@ class ProductDAO(BaseDAO):
             raise e
         finally:
             cursor.close()
-            conn.close()
 
     def update_product(self, product_id, name, description, price, stock, category, image_url, tags_text, status):
         """Update existing product details and tags using a single transaction."""
@@ -347,7 +346,6 @@ class ProductDAO(BaseDAO):
             raise e
         finally:
             cursor.close()
-            conn.close()
 
     def toggle_status(self, product_id):
         """Toggle product status between Active and Inactive."""

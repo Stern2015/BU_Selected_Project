@@ -14,8 +14,8 @@ class SQL_Executor:
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchall()
-        finally:
-            conn.close()
+        except Exception as e:
+            raise e
 
     '''
     execute SELECT statement and return ONE record
@@ -26,8 +26,8 @@ class SQL_Executor:
             with conn.cursor() as cursor:
                 cursor.execute(sql, params)
                 return cursor.fetchone()
-        finally:
-            conn.close()
+        except Exception as e:
+            raise e
 
     '''
     execute_update to execute Insert/Delete/Update operations
@@ -42,5 +42,3 @@ class SQL_Executor:
         except Exception as e:
             conn.rollback()
             raise e
-        finally:
-            conn.close()
