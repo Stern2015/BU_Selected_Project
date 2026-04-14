@@ -19,6 +19,7 @@ customer_dao = CustomerDAO()
 vendor_service = VendorService()
 order_service = OrderService()
 sql_executor = SQL_Executor()
+auth = Auth_Service()
 
 # Role Bitmasks
 ROLE_CUSTOMER = 1
@@ -48,9 +49,9 @@ def inject_globals():
 
 # --- PUBLIC & AUTH ROUTES ---
 
+# Home page redirects to product browsing page
 @app.route('/')
 def index():
-    """Home page redirects to product browsing page"""
     return redirect(url_for('products'))
 
 @app.route('/product/<pid>')
@@ -125,9 +126,6 @@ def products():
         total_pages=total_pages,
         request=request
     )
-
-
-auth = Auth_Service()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -426,7 +424,7 @@ def rate_vendor(vid):
         
     return redirect(request.referrer or url_for('index'))
 
-# --- VENDOR ROUTES ---
+# --- VENDOR ROUTES  Vendor management---
 
 @app.route('/vendor')
 def vendor_dashboard():
@@ -631,6 +629,7 @@ def vendor_update():
 def vendor_update_info():
     return vendor_update()
 
+# onboard product
 @app.route('/vendor/products/add', methods=['POST'])
 def add_vendor_product():
     """POST /vendor/products/add - Create a new product"""

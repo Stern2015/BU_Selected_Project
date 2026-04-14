@@ -6,14 +6,6 @@ class TagDAO(BaseDAO):
         super().__init__()
 
     def get_products_by_tags(self, tag_names, operator='OR', limit=20, offset=0):
-        """
-        Get active products by tags.
-
-        tag_names: list[str]
-        operator:
-            'OR'  -> match any tag
-            'AND' -> match all tags
-        """
         cleaned_tags = [tag.strip().lower() for tag in (tag_names or []) if tag and tag.strip()]
         if not cleaned_tags:
             return []

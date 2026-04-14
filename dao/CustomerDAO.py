@@ -130,7 +130,7 @@ class CustomerDAO(BaseDAO):
             return 0
         return self.save_order_history(customer_id, orders)
 
-# Transaction
+# Transaction aka suborder
     def create_transaction(self, transaction_id, order_id, vendor_id, payment_amount):
         sql = """
             INSERT INTO `Transaction`

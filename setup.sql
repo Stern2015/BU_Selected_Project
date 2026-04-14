@@ -299,7 +299,7 @@ CREATE TABLE orders (
     INDEX idx_order_date (order_date),
     INDEX idx_order_status (status),
     FOREIGN KEY (customer_id) REFERENCES Customer(User_ID)
-) COMMENT 'Main order table';
+);
 
 -- Sub Order Table(Transaction)
 CREATE TABLE sub_orders (

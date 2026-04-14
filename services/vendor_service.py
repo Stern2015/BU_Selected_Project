@@ -8,19 +8,10 @@ from driver.sql_executor import SQL_Executor
 
 
 class VendorService:
-    """Vendor service class for handling vendor-related operations"""
-
     def __init__(self):
         self.executor = SQL_Executor()
 
     def get_all_vendors(self):
-        """
-        Retrieve all vendors list (for admin dashboard or homepage display)
-        
-        Returns:
-            list: List of vendor tuples containing (Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At)
-                  Returns empty list if no vendors found
-        """
         sql = """
             SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
             FROM Vendor
@@ -34,18 +25,6 @@ class VendorService:
             return []
 
     def onboard_new_vendor(self, user_id, business_name, geographical_presence):
-        """
-        Create new vendor account (vendor onboarding)
-        Creates a Vendor record and associates it with UserAccount role
-        
-        Args:
-            user_id (str): The ID of the user account that will act as vendor
-            business_name (str): The name of the business/store
-            geographical_presence (str): The location/geographical presence of the vendor
-        
-        Returns:
-            dict: {'success': bool, 'vendor_id': str, 'message': str}
-        """
         try:
             # Generate vendor ID using user ID as base (following database convention)
             vendor_id = user_id
@@ -79,16 +58,6 @@ class VendorService:
             return {'success': False, 'vendor_id': None, 'message': f'Error: {str(e)}'}
 
     def get_vendor_by_id(self, vendor_id):
-        """
-        Retrieve single vendor details
-        
-        Args:
-            vendor_id (str): The vendor ID to query
-        
-        Returns:
-            dict: Vendor details including business_name, average_rating, geographical_presence
-                  Returns None if vendor not found
-        """
         try:
             sql = """
                 SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
@@ -114,17 +83,6 @@ class VendorService:
             return None
 
     def update_vendor_info(self, vendor_id, business_name=None, geographical_presence=None):
-        """
-        Update vendor information (store name and/or location)
-        
-        Args:
-            vendor_id (str): The vendor ID to update
-            business_name (str, optional): New store name
-            geographical_presence (str, optional): New location/geographical presence
-        
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
         try:
             # Check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
@@ -164,16 +122,6 @@ class VendorService:
             return {'success': False, 'message': f'Error: {str(e)}'}
 
     def get_vendor_products(self, vendor_id):
-        """
-        Retrieve all products for a specific vendor
-        
-        Args:
-            vendor_id (str): The vendor ID
-        
-        Returns:
-            list: List of product tuples for the vendor
-                  Returns empty list if vendor has no products
-        """
         try:
             # First verify vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
@@ -199,16 +147,7 @@ class VendorService:
             return []
 
     def get_vendor_average_rating(self, vendor_id):
-        """
-        Calculate/retrieve average rating for a vendor
-        Computes average rating from customer ratings
 
-        Args:
-            vendor_id (str): The vendor ID
-
-        Returns:
-            float: Average rating (0.00 - 5.00), or 0.00 if no ratings or vendor not found
-        """
         try:
             # Get average rating from customer's Rating table
             sql = """
@@ -238,20 +177,6 @@ class VendorService:
             return 0.00
 
     def get_vendor_orders(self, vendor_id):
-        """
-        Retrieve all orders received by a vendor
-        (Vendor view of their received orders)
-        
-        Note: This requires Order and OrderItem tables to exist in database
-        Current implementation returns empty list if tables don't exist
-        
-        Args:
-            vendor_id (str): The vendor ID
-        
-        Returns:
-            list: List of order information for products sold by this vendor
-                  Returns empty list if no orders found or tables don't exist
-        """
         try:
             # Verify vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
@@ -283,16 +208,6 @@ class VendorService:
     # Additional utility methods
     
     def get_vendor_stats(self, vendor_id):
-        """
-        Get comprehensive statistics about a vendor
-        
-        Args:
-            vendor_id (str): The vendor ID
-        
-        Returns:
-            dict: Statistics including product count, average rating, total sales (if available)
-                  Returns None if vendor not found
-        """
         try:
             vendor = self.get_vendor_by_id(vendor_id)
             if not vendor:
@@ -322,16 +237,6 @@ class VendorService:
             return None
 
     def update_vendor_rating(self, vendor_id, new_rating):
-        """
-        Update vendor rating in the Vendor table
-        
-        Args:
-            vendor_id (str): The vendor ID
-            new_rating (float): The new rating value (0.00 - 5.00)
-        
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
         try:
             # Validate rating range
             if new_rating < 0.00 or new_rating > 5.00:
@@ -363,15 +268,6 @@ class VendorService:
             return {'success': False, 'message': f'Error: {str(e)}'}
 
     def deactivate_vendor(self, vendor_id):
-        """
-        Deactivate a vendor account
-        
-        Args:
-            vendor_id (str): The vendor ID to deactivate
-        
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
         try:
             # Check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
@@ -399,15 +295,6 @@ class VendorService:
             return {'success': False, 'message': f'Error: {str(e)}'}
 
     def activate_vendor(self, vendor_id):
-        """
-        Activate a vendor account
-        
-        Args:
-            vendor_id (str): The vendor ID to activate
-        
-        Returns:
-            dict: {'success': bool, 'message': str}
-        """
         try:
             # Check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"

@@ -199,8 +199,8 @@ class ProductDAO(BaseDAO):
         result = self.executor.execute_query_one(sql, (vendor_id,))
         return result["Store_Name"] if result else "Unknown"
 
+    ## List products for a specific vendor with status filtering.
     def list_vendor_products(self, vendor_id, tab='all', limit=20, offset=0):
-        """List products for a specific vendor with status filtering."""
         clauses = ["p.Vendor_ID = %s"]
         params = [vendor_id]
 
@@ -240,9 +240,10 @@ class ProductDAO(BaseDAO):
         params.extend([limit, offset])
         rows = self.executor.execute_query(sql, tuple(params))
         return [self._format_product_card(row) for row in rows]
-
+    
+    ## Count products for a specific vendor with status filtering.
     def count_vendor_products(self, vendor_id, tab='all'):
-        """Count products for a specific vendor with status filtering."""
+        
         clauses = ["Vendor_ID = %s"]
         params = [vendor_id]
 
@@ -258,8 +259,8 @@ class ProductDAO(BaseDAO):
         result = self.executor.execute_query_one(sql, tuple(params))
         return int(result["total"] or 0) if result else 0
 
+    # Add a new product with tags using a robust transaction.
     def add_product(self, product_id, name, description, price, stock, category, image_url, vendor_id, tags_text):
-        """Add a new product with tags using a robust transaction."""
         operations = []
         
         # 1. Add product insert operation
@@ -305,8 +306,8 @@ class ProductDAO(BaseDAO):
         finally:
             cursor.close()
 
+    # Update existing product details and tags using a single transaction
     def update_product(self, product_id, name, description, price, stock, category, image_url, tags_text, status):
-        """Update existing product details and tags using a single transaction."""
         conn = self.executor.conn_manager.get_connection()
         cursor = conn.cursor()
         try:
@@ -346,9 +347,8 @@ class ProductDAO(BaseDAO):
             raise e
         finally:
             cursor.close()
-
+    # Toggle product status between Active and Inactive
     def toggle_status(self, product_id):
-        """Toggle product status between Active and Inactive."""
         sql = """
             UPDATE Product 
             SET Status = CASE WHEN Status = 'Active' THEN 'Inactive' ELSE 'Active' END,
@@ -357,8 +357,8 @@ class ProductDAO(BaseDAO):
         """
         return self.executor.execute_update(sql, (product_id,))
 
+    ## Update product stock quantity and manage Status
     def update_stock(self, product_id, amount, action):
-        """Update product stock quantity and automatically manage Status."""
         if action == 'increase':
             sql = """
                 UPDATE Product 
@@ -380,8 +380,9 @@ class ProductDAO(BaseDAO):
             return 0
         return self.executor.execute_update(sql, (amount, product_id))
 
+    ## Fetch multiple product details in one query.
     def get_products_by_ids(self, pids):
-        """Fetch multiple product details in one query."""
+        
         if not pids:
             return []
         
@@ -395,8 +396,9 @@ class ProductDAO(BaseDAO):
         """
         return self.executor.execute_query(sql, tuple(pids))
 
+    # Get aggregate stats for a vendor in one query.
     def get_vendor_stats(self, vendor_id):
-        """Get aggregate stats for a vendor in one query."""
+        
         sql = """
             SELECT 
                 COUNT(*) as total_products,
