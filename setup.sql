@@ -66,15 +66,15 @@ INSERT INTO UserAccount VALUES
 ('u5', 'vendor2', '123', '1300000000', 2);
 
 INSERT INTO Admins VALUES
-('u1', "王小二");
+('u1', 'Admin One');
 
 INSERT INTO Vendor VALUES
 ('u4', "Digital Store", 'Beijing', 'Active', 4.8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('u5', "Home Living", 'Shanghai', 'Active', 4.5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO Customer VALUES
-('u2', "悟空", "广东省深圳市", "history"),
-('u3', "猪八戒", "广东省广州市", "history");
+('u2', 'customer_one', 'Guangdong Shenzhen', 'history'),
+('u3', 'customer_two', 'Guangdong Guangzhou', 'history');
 
 
 -- Rating table (customer rates vendor)
@@ -118,7 +118,12 @@ CREATE TABLE Product (
 INSERT INTO Product VALUES
 ('p1', 'High-Performance Laptop', "", 5999, 50, 'Electronics', 'https://picsum.photos/seed/laptop/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('p2', 'Ergonomic Office Chair', "", 899, 50, 'Electronics', 'https://picsum.photos/seed/chair/300/200', 'u5', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('p3', 'Wireless Headphones', "", 1299, 50, 'Electronics', 'https://picsum.photos/seed/headphone/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('p3', 'Wireless Headphones', "", 1299, 50, 'Electronics', 'https://picsum.photos/seed/headphone/300/200', 'u4', 'Active', 5.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p4', 'Gaming Laptop Pro 16', 'High-end gaming laptop with dedicated graphics.', 8999, 25, 'Electronics', 'https://picsum.photos/seed/gaming-laptop/300/200', 'u4', 'Active', 4.9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p5', 'Business Ultrabook 14', 'Lightweight business laptop with long battery life.', 6999, 30, 'Electronics', 'https://picsum.photos/seed/ultrabook/300/200', 'u4', 'Active', 4.8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p6', 'Mini Desktop PC', 'Compact desktop computer for office and home use.', 4599, 18, 'Electronics', 'https://picsum.photos/seed/mini-pc/300/200', 'u5', 'Active', 4.7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p7', 'All-in-One Workstation', 'Large-screen all-in-one computer for productivity.', 7599, 12, 'Electronics', 'https://picsum.photos/seed/workstation/300/200', 'u5', 'Active', 4.8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('p8', 'Student Notebook Air', 'Affordable notebook designed for study and daily tasks.', 3999, 40, 'Electronics', 'https://picsum.photos/seed/student-notebook/300/200', 'u4', 'Active', 4.6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- Tag table
 CREATE TABLE Tag (
@@ -146,7 +151,11 @@ INSERT INTO Tag (Name) VALUES
 ('Tech'),
 ('Office'),
 ('Ergonomic'),
-('Audio');
+('Audio'),
+('Gaming'),
+('Laptop'),
+('Desktop'),
+('Portable');
 
 INSERT INTO Tagging (Product_ID, Tag_ID, Position)
 SELECT 'p1', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
@@ -160,6 +169,41 @@ SELECT 'p2', Tag_ID, 2 FROM Tag WHERE Name = 'Ergonomic';
 
 INSERT INTO Tagging (Product_ID, Tag_ID, Position)
 SELECT 'p3', Tag_ID, 1 FROM Tag WHERE Name = 'Audio';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p4', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p4', Tag_ID, 2 FROM Tag WHERE Name = 'Gaming';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p4', Tag_ID, 3 FROM Tag WHERE Name = 'Laptop';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p5', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p5', Tag_ID, 2 FROM Tag WHERE Name = 'Laptop';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p5', Tag_ID, 3 FROM Tag WHERE Name = 'Portable';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p6', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p6', Tag_ID, 2 FROM Tag WHERE Name = 'Desktop';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p6', Tag_ID, 3 FROM Tag WHERE Name = 'Office';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p7', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p7', Tag_ID, 2 FROM Tag WHERE Name = 'Desktop';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p7', Tag_ID, 3 FROM Tag WHERE Name = 'Office';
+
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p8', Tag_ID, 1 FROM Tag WHERE Name = 'Computer';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p8', Tag_ID, 2 FROM Tag WHERE Name = 'Laptop';
+INSERT INTO Tagging (Product_ID, Tag_ID, Position)
+SELECT 'p8', Tag_ID, 3 FROM Tag WHERE Name = 'Portable';
 
 
 -- Insert sample data
