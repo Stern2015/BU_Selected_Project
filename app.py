@@ -1,6 +1,5 @@
 import uuid
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
-from driver.sql_executor import SQL_Executor
 from dao.ProductDAO import ProductDAO
 from dao.TagDAO import TagDAO
 from dao.UserDAO import UserDAO
@@ -18,7 +17,6 @@ user_dao = UserDAO()
 customer_dao = CustomerDAO()
 vendor_service = VendorService()
 order_service = OrderService()
-sql_executor = SQL_Executor()
 auth = Auth_Service()
 
 # Role Bitmasks
@@ -521,8 +519,7 @@ def vendor_dashboard():
             })
 
         # Efficiently get low stock products
-        sql_low_stock = "SELECT Product_ID as id, Name as name, Stock as stock FROM Product WHERE Vendor_ID = %s AND Stock > 0 AND Stock < 10 LIMIT 5"
-        low_stock_products = sql_executor.execute_query(sql_low_stock, (vid,))
+        low_stock_products = product_dao.get_low_stock_products(vid, limit=5)
 
         recent_activity = [
             {
@@ -759,9 +756,8 @@ def save_product():
             # Check ownership and update
             p = product_dao.get_public_product_detail(pid) # Also gets for vendor if exists
             if not p: # Might be inactive
-                sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
-                row = sql_executor.execute_query_one(sql, (pid,))
-                if row and row['Vendor_ID'] == vid:
+                is_owner = product_dao.check_product_ownership(pid, vid)
+                if is_owner:
                     product_dao.update_product(pid, name, description, price, stock, category, image_url, tags_text, status)
                     flash('Product updated successfully.')
                 else:
@@ -788,10 +784,9 @@ def toggle_product_status(product_id):
 
     vid = session['user']['id']
     # Check ownership
-    sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
-    row = sql_executor.execute_query_one(sql, (product_id,))
+    is_owner = product_dao.check_product_ownership(product_id, vid)
     
-    if row and row['Vendor_ID'] == vid:
+    if is_owner:
         product_dao.toggle_status(product_id)
         flash('Product status toggled.')
     else:
@@ -808,10 +803,9 @@ def update_product_stock(product_id):
     vid = session['user']['id']
     
     # Secure check: ensure product belongs to vendor
-    sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
-    row = sql_executor.execute_query_one(sql, (product_id,))
+    is_owner = product_dao.check_product_ownership(product_id, vid)
 
-    if not row or row['Vendor_ID'] != vid:
+    if not is_owner:
         return jsonify({'success': False, 'message': 'Product not found or permission denied'}), 404
 
     try:
@@ -825,7 +819,7 @@ def update_product_stock(product_id):
         product_dao.update_stock(product_id, amount, action)
         
         # Get updated info with explicit aliases to avoid case-sensitivity issues
-        new_row = sql_executor.execute_query_one("SELECT Stock as stock, Status as status FROM Product WHERE Product_ID = %s", (product_id,))
+        new_row = product_dao.get_product_stock_status(product_id)
         return jsonify({
             'success': True, 
             'stock': int(new_row['stock']), 
@@ -915,8 +909,7 @@ def save_vendor():
             flash(result.get('message') or 'Failed to create vendor.')
         else:
             # Upgrade user role in database
-            sql = "UPDATE UserAccount SET Role_Bits = Role_Bits | %s WHERE User_ID = %s"
-            sql_executor.execute_update(sql, (ROLE_VENDOR, user_id))
+            user_dao.add_role(user_id, ROLE_VENDOR)
             flash('Vendor added and user role upgraded.')
         
     return redirect(url_for('admin_dashboard'))

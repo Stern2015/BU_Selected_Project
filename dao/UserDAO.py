@@ -13,3 +13,7 @@ class UserDAO(BaseDAO):
     def get_all_users(self):
         sql = "SELECT User_ID as id, Username as username, PasswordHash as password, Role_Bits as role FROM UserAccount"
         return self.executor.execute_query(sql)
+    
+    def add_role(self, user_id, role_bit):
+        sql = "UPDATE UserAccount SET Role_Bits = Role_Bits | %s WHERE User_ID = %s" 
+        return self.executor.execute_update(sql, (role_bit, user_id))

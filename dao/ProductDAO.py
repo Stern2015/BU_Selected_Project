@@ -410,3 +410,16 @@ class ProductDAO(BaseDAO):
             WHERE Vendor_ID = %s
         """
         return self.executor.execute_query_one(sql, (vendor_id,))
+
+    def get_low_stock_products(self, vendor_id, limit=5):
+        sql = "SELECT Product_ID as id, Name as name, Stock as stock FROM Product WHERE Vendor_ID = %s AND Stock > 0 AND Stock < 10 LIMIT %s"
+        return self.executor.execute_query(sql, (vendor_id, limit))
+
+    def check_product_ownership(self, product_id, vendor_id):
+        sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
+        row = self.executor.execute_query_one(sql, (product_id,))
+        return row and row['Vendor_ID'] == vendor_id
+
+    def get_product_stock_status(self, product_id):
+        sql = "SELECT Stock as stock, Status as status FROM Product WHERE Product_ID = %s"
+        return self.executor.execute_query_one(sql, (product_id,))
