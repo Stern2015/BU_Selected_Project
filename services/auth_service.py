@@ -1,6 +1,5 @@
 """
-Auth Service
-Handles business logic related to authentication
+Auth Service, Handles business logic related to authentication
 """
 
 from driver.sql_executor import SQL_Executor

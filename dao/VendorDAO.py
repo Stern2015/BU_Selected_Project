@@ -1,7 +1,5 @@
 """
 Vendor Data Access Object (DAO)
-Handles all database operations for vendor management
-Implements CRUD operations and vendor-related queries
 """
 
 from driver.sql_executor import SQL_Executor
@@ -12,8 +10,6 @@ from dao.BaseDAO import BaseDAO
 class VendorDAO(BaseDAO):
     def __init__(self):
         super().__init__()
-    
-    # ===== CREATE OPERATIONS =====
     
     def insert(self, vendor_id, store_name, location, status='Active', rating=0.00):
         try:
@@ -27,13 +23,11 @@ class VendorDAO(BaseDAO):
             print(f"Error inserting vendor: {str(e)}")
             return False
     
-    # ===== READ OPERATIONS =====
     def select_by_id(self, vendor_id):
         try:
             sql = """
                 SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                FROM Vendor
-                WHERE Vendor_ID = %s
+                FROM Vendor WHERE Vendor_ID = %s
             """
             result = self.executor.execute_query_one(sql, (vendor_id,))
             
@@ -49,58 +43,54 @@ class VendorDAO(BaseDAO):
             if limit:
                 sql = """
                     SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                    FROM Vendor
-                    ORDER BY Created_At DESC
-                    LIMIT %s OFFSET %s
+                    FROM Vendor ORDER BY Created_At DESC LIMIT %s OFFSET %s
                 """
                 results = self.executor.execute_query(sql, (limit, offset))
             else:
                 sql = """
                     SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                    FROM Vendor
-                    ORDER BY Created_At DESC
+                    FROM Vendor ORDER BY Created_At DESC
                 """
                 results = self.executor.execute_query(sql)
             
             return [self._map_row_to_dict(row) for row in results] if results else []
         except Exception as e:
+
             print(f"Error selecting all vendors: {str(e)}")
             return []
     
     def select_by_status(self, status):
         try:
-            sql = """
-                SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                FROM Vendor
-                WHERE Status = %s
-                ORDER BY Created_At DESC
-            """
+            sql = """SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
+                FROM Vendor WHERE Status = %s ORDER BY Created_At DESC"""
             results = self.executor.execute_query(sql, (status,))
             return [self._map_row_to_dict(row) for row in results] if results else []
         except Exception as e:
+
             print(f"Error selecting vendors by status: {str(e)}")
             return []
     
-    def select_by_location(self, location):
+    def select_by_location(self, locat):
         try:
-            sql = """
-                SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                FROM Vendor
-                WHERE Location LIKE %s
-                ORDER BY Created_At DESC
-            """
-            results = self.executor.execute_query(sql, (f"%{location}%",))
+            sql = """SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
+                FROM Vendor WHERE Location LIKE %s ORDER BY Created_At DESC"""
+            
+            results = self.executor.execute_query(sql, (f"%{locat}%",))
             return [self._map_row_to_dict(row) for row in results] if results else []
+        
         except Exception as e:
+
             print(f"Error selecting vendors by location: {str(e)}")
             return []
     
     def count_all(self):
         try:
             sql = "SELECT COUNT(*) FROM Vendor"
+
             result = self.executor.execute_query_one(sql)
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error counting vendors: {str(e)}")
             return 0
     
@@ -110,11 +100,11 @@ class VendorDAO(BaseDAO):
             result = self.executor.execute_query_one(sql, (status,))
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error counting vendors by status: {str(e)}")
             return 0
     
-    # ===== UPDATE OPERATIONS =====
-    
+    # update vendor info 
     def update(self, vendor_id, **fields):
         try:
             if not fields:
@@ -122,8 +112,6 @@ class VendorDAO(BaseDAO):
             
             update_parts = []
             values = []
-            
-            # Map field names to database column names
             field_mapping = {
                 'store_name': 'Store_Name',
                 'location': 'Location',
@@ -136,34 +124,38 @@ class VendorDAO(BaseDAO):
                 if field in field_mapping:
                     update_parts.append(f"{field_mapping[field]} = %s")
                     values.append(value)
-            
             if not update_parts:
                 return False
             
-            # Always update the Updated_At timestamp
             update_parts.append("Updated_At = NOW()")
             values.append(vendor_id)
-            
+
+            # write sql statement and exec
             sql = f"UPDATE Vendor SET {', '.join(update_parts)} WHERE Vendor_ID = %s"
             affected = self.executor.execute_update(sql, tuple(values))
             return affected > 0
         except Exception as e:
-            print(f"Error updating vendor: {str(e)}")
+
+            print(f"Error updat vendor: {str(e)}")
             return False
     
+    # update ratings for vendor id
     def update_rating(self, vendor_id, new_rating):
         try:
             # Validate rating range
             if new_rating < 0.00 or new_rating > 5.00:
                 raise ValueError("Rating must be between 0.00 and 5.00")
             
+            # 
             sql = "UPDATE Vendor SET Rating = %s, Updated_At = NOW() WHERE Vendor_ID = %s"
             affected = self.executor.execute_update(sql, (new_rating, vendor_id))
             return affected > 0
         except Exception as e:
+
             print(f"Error updating rating: {str(e)}")
             return False
     
+    # update vendor status on/off board
     def update_status(self, vendor_id, status):
         try:
             if status not in ['Active', 'Inactive']:
@@ -173,11 +165,11 @@ class VendorDAO(BaseDAO):
             affected = self.executor.execute_update(sql, (status, vendor_id))
             return affected > 0
         except Exception as e:
+
             print(f"Error updating status: {str(e)}")
             return False
     
-    # ===== DELETE OPERATIONS =====
-    
+    # del vendor
     def delete(self, vendor_id):
 
         try:
@@ -185,76 +177,84 @@ class VendorDAO(BaseDAO):
             affected = self.executor.execute_update(sql, (vendor_id,))
             return affected > 0
         except Exception as e:
+
             print(f"Error deleting vendor: {str(e)}")
             return False
     
-    # ===== RELATIONSHIP QUERIES =====
-    
+    # get total product count of vendor
     def get_vendor_products_count(self, vendor_id):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s"
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error getting product count: {str(e)}")
             return 0
     
+    #get product on shelve
     def get_vendor_active_products_count(self, vendor_id):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s AND Status = 'Active'"
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error getting active product count: {str(e)}")
             return 0
     
+    #get prod number which are out of stock
     def get_vendor_out_of_stock_count(self, vendor_id):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s AND Stock = 0"
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error getting out of stock count: {str(e)}")
             return 0
     
+    #cal total stock 
     def get_vendor_total_stock(self, vendor_id):
         try:
             sql = "SELECT COALESCE(SUM(Stock), 0) FROM Product WHERE Vendor_ID = %s"
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result[0] if result else 0
         except Exception as e:
+
             print(f"Error getting total stock: {str(e)}")
             return 0
     
+    # get vendor orders count 
     def get_vendor_orders_count(self, vendor_id):
         try:
             sql = """
-                SELECT COUNT(DISTINCT o.Order_ID)
-                FROM Order o
-                JOIN OrderItem oi ON o.Order_ID = oi.Order_ID
-                JOIN Product p ON oi.Product_ID = p.Product_ID
+                SELECT COUNT(DISTINCT o.Order_ID) FROM Order o JOIN OrderItem oi ON o.Order_ID = oi.Order_ID JOIN Product p ON oi.Product_ID = p.Product_ID
                 WHERE p.Vendor_ID = %s
             """
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result[0] if result else 0
+        
         except Exception as e:
+
             print(f"Error getting orders count: {str(e)}")
             return 0
     
-    # ===== UTILITY METHODS =====
-    
+    # test if vendor is exist
     def exists(self, vendor_id):
         try:
             sql = "SELECT 1 FROM Vendor WHERE Vendor_ID = %s LIMIT 1"
             result = self.executor.execute_query_one(sql, (vendor_id,))
             return result is not None
+        
         except Exception as e:
+
             print(f"Error checking vendor existence: {str(e)}")
             return False
     
+    # get vendor status info
     def get_vendor_stats(self, vendor_id):
         try:
-            # Check if vendor exists first
             if not self.exists(vendor_id):
                 return None
             
@@ -266,47 +266,47 @@ class VendorDAO(BaseDAO):
                 'orders_count': self.get_vendor_orders_count(vendor_id)
             }
         except Exception as e:
+
             print(f"Error getting vendor stats: {str(e)}")
+
             return None
     
     def activate_all_in_location(self, location):
         try:
             sql = """
-                UPDATE Vendor 
-                SET Status = 'Active', Updated_At = NOW() 
+                UPDATE Vendor SET Status = 'Active', Updated_At = NOW() 
                 WHERE Location LIKE %s AND Status = 'Inactive'
             """
             affected = self.executor.execute_update(sql, (f"%{location}%",))
             return affected
+        
         except Exception as e:
+
             print(f"Error activating vendors: {str(e)}")
+
             return 0
     
     def deactivate_all_in_location(self, location):
         try:
             sql = """
-                UPDATE Vendor 
-                SET Status = 'Inactive', Updated_At = NOW() 
+                UPDATE Vendor SET Status = 'Inactive', Updated_At = NOW() 
                 WHERE Location LIKE %s AND Status = 'Active'
             """
             affected = self.executor.execute_update(sql, (f"%{location}%",))
             return affected
+        
         except Exception as e:
+
             print(f"Error deactivating vendors: {str(e)}")
+
             return 0
-    
-    # ===== HELPER METHODS =====
-    
+
+    # tanslate to dict for use good
     def _map_row_to_dict(self, row):
         if not row:
             return None
         
-        return {
-            'vendor_id': row[0],
-            'store_name': row[1],
-            'location': row[2],
-            'status': row[3],
-            'rating': float(row[4]),
-            'created_at': row[5],
-            'updated_at': row[6]
-        }
+        return {'vendor_id': row[0], 'store_name': row[1],
+            'location': row[2], 'status': row[3],
+            'rating': float(row[4]), 'created_at': row[5],
+            'updated_at': row[6]}

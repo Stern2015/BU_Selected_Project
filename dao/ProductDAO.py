@@ -1,10 +1,10 @@
 from dao.BaseDAO import BaseDAO
 
-
 class ProductDAO(BaseDAO):
     def __init__(self):
         super().__init__()
 
+    # for search , filter out products
     def _build_public_filters(self, keyword=None, category=None, min_price=None, max_price=None, tags=None):
         clauses = [
             "p.Status = 'Active'",
@@ -26,6 +26,7 @@ class ProductDAO(BaseDAO):
 
         # Unified Search/Discovery Logic:
         # "where the tag matches any part of the product's name or its associated tags"
+
         search_terms = []
         if keyword:
             search_terms.append(keyword)
@@ -52,6 +53,7 @@ class ProductDAO(BaseDAO):
 
         return " AND ".join(clauses), params
 
+    # return formated product infos
     def _format_product_card(self, row):
         tag_names = row["tag_names"].split("||") if row["tag_names"] else []
         stock = int(row["stock"] or 0)
@@ -68,6 +70,7 @@ class ProductDAO(BaseDAO):
             stock_status = "In Stock"
             stock_class = "text-green-500"
 
+        ## return product info as dict, for front end use good
         return {
             "id": row["id"],
             "name": row["name"],
@@ -90,7 +93,7 @@ class ProductDAO(BaseDAO):
 
     def list_public_products(self, keyword=None, category=None, min_price=None, max_price=None,
                              tags=None, limit=20, offset=0):
-        where_sql, params = self._build_public_filters(
+        where_condition, params = self._build_public_filters(
             keyword=keyword,
             category=category,
             min_price=min_price,
@@ -100,23 +103,23 @@ class ProductDAO(BaseDAO):
 
         sql = f"""
             SELECT
-                p.Product_ID AS id,
-                p.Name AS name,
-                COALESCE(p.Description, '') AS description,
-                p.Price AS price,
-                p.Stock AS stock,
-                p.Category AS category,
-                p.Image_URL AS image_url,
-                p.Vendor_ID AS vendor_id,
-                p.Status AS status,
-                COALESCE(p.Rating, 0) AS rating,
-                v.Store_Name AS store_name,
-                COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
+            p.Product_ID AS id,
+            p.Name AS name,
+            COALESCE(p.Description, '') AS description,
+            p.Price AS price,
+            p.Stock AS stock,
+            p.Category AS category,
+            p.Image_URL AS image_url,
+            p.Vendor_ID AS vendor_id,
+            p.Status AS status,
+            COALESCE(p.Rating, 0) AS rating,
+            v.Store_Name AS store_name,
+            COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
             FROM Product p
             JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
             LEFT JOIN Tagging tg ON tg.Product_ID = p.Product_ID
             LEFT JOIN Tag t ON t.Tag_ID = tg.Tag_ID
-            WHERE {where_sql}
+            WHERE {where_condition}
             GROUP BY
                 p.Product_ID, p.Name, p.Description, p.Price, p.Stock,
                 p.Category, p.Image_URL, p.Vendor_ID, p.Status, p.Rating, v.Store_Name
@@ -127,7 +130,8 @@ class ProductDAO(BaseDAO):
         return [self._format_product_card(row) for row in rows]
 
     def count_public_products(self, keyword=None, category=None, min_price=None, max_price=None, tags=None):
-        where_sql, params = self._build_public_filters(
+
+        where_condition, params = self._build_public_filters(
             keyword=keyword,
             category=category,
             min_price=min_price,
@@ -137,28 +141,30 @@ class ProductDAO(BaseDAO):
 
         sql = f"""
             SELECT COUNT(DISTINCT p.Product_ID) AS total
-            FROM Product p
-            JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
-            WHERE {where_sql}
+            FROM Product p JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
+            WHERE {where_condition}
         """
+
         result = self.executor.execute_query_one(sql, tuple(params))
+
         return int(result["total"] or 0) if result else 0
 
     def get_public_product_detail(self, product_id):
+
         sql = """
             SELECT
-                p.Product_ID AS id,
-                p.Name AS title,
-                COALESCE(p.Description, '') AS description,
-                p.Price AS price,
-                p.Stock AS stock,
-                p.Category AS category,
-                p.Image_URL AS image,
-                p.Vendor_ID AS vendor_id,
-                p.Status AS status,
-                COALESCE(p.Rating, 0) AS rating,
-                v.Store_Name AS store_name,
-                COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
+            p.Product_ID AS id,
+            p.Name AS title,
+            COALESCE(p.Description, '') AS description,
+            p.Price AS price,
+            p.Stock AS stock,
+            p.Category AS category,
+            p.Image_URL AS image,
+            p.Vendor_ID AS vendor_id,
+            p.Status AS status,
+            COALESCE(p.Rating, 0) AS rating,
+            v.Store_Name AS store_name,
+            COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
             FROM Product p
             JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
             LEFT JOIN Tagging tg ON tg.Product_ID = p.Product_ID
@@ -190,17 +196,22 @@ class ProductDAO(BaseDAO):
         }
 
     def get_all_categories(self):
+
         sql = "SELECT Name FROM Category ORDER BY Name"
         rows = self.executor.execute_query(sql)
+
         return [row["Name"] for row in rows]
 
     def get_vendor_name(self, vendor_id):
+
         sql = "SELECT Store_Name FROM Vendor WHERE Vendor_ID = %s"
         result = self.executor.execute_query_one(sql, (vendor_id,))
+
         return result["Store_Name"] if result else "Unknown"
 
     ## List products for a specific vendor with status filtering.
     def list_vendor_products(self, vendor_id, tab='all', limit=20, offset=0):
+
         clauses = ["p.Vendor_ID = %s"]
         params = [vendor_id]
 
@@ -214,18 +225,18 @@ class ProductDAO(BaseDAO):
         where_sql = " AND ".join(clauses)
         sql = f"""
             SELECT
-                p.Product_ID AS id,
-                p.Name AS name,
-                COALESCE(p.Description, '') AS description,
-                p.Price AS price,
-                p.Stock AS stock,
-                p.Category AS category,
-                p.Image_URL AS image_url,
-                p.Vendor_ID AS vendor_id,
-                p.Status AS status,
-                COALESCE(p.Rating, 0) AS rating,
-                v.Store_Name AS store_name,
-                COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
+            p.Product_ID AS id,
+            p.Name AS name,
+            COALESCE(p.Description, '') AS description,
+            p.Price AS price,
+            p.Stock AS stock,
+            p.Category AS category,
+            p.Image_URL AS image_url,
+            p.Vendor_ID AS vendor_id,
+            p.Status AS status,
+            COALESCE(p.Rating, 0) AS rating,
+            v.Store_Name AS store_name,
+            COALESCE(GROUP_CONCAT(t.Name ORDER BY tg.Position SEPARATOR '||'), '') AS tag_names
             FROM Product p
             JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
             LEFT JOIN Tagging tg ON tg.Product_ID = p.Product_ID
@@ -239,9 +250,10 @@ class ProductDAO(BaseDAO):
         """
         params.extend([limit, offset])
         rows = self.executor.execute_query(sql, tuple(params))
+
         return [self._format_product_card(row) for row in rows]
     
-    ## Count products for a specific vendor with status filtering.
+    ## Count products
     def count_vendor_products(self, vendor_id, tab='all'):
         
         clauses = ["Vendor_ID = %s"]
@@ -257,6 +269,7 @@ class ProductDAO(BaseDAO):
         where_sql = " AND ".join(clauses)
         sql = f"SELECT COUNT(*) AS total FROM Product WHERE {where_sql}"
         result = self.executor.execute_query_one(sql, tuple(params))
+
         return int(result["total"] or 0) if result else 0
 
     # Add a new product with tags using a robust transaction.
@@ -306,8 +319,9 @@ class ProductDAO(BaseDAO):
         finally:
             cursor.close()
 
-    # Update existing product details and tags using a single transaction
+    # Update existing product details and tags in a transaction
     def update_product(self, product_id, name, description, price, stock, category, image_url, tags_text, status):
+
         conn = self.executor.conn_manager.get_connection()
         cursor = conn.cursor()
         try:
@@ -317,10 +331,11 @@ class ProductDAO(BaseDAO):
             # 1. Update basic info
             sql_update = """
                 UPDATE Product SET 
-                    Name = %s, Description = %s, Price = %s, Stock = %s, 
-                    Category = %s, Image_URL = %s, Status = %s, Updated_At = NOW()
+                Name = %s, Description = %s, Price = %s, Stock = %s, 
+                Category = %s, Image_URL = %s, Status = %s, Updated_At = NOW()
                 WHERE Product_ID = %s
             """
+
             params_update = (name, description, price, stock, category, image_url, status, product_id)
             cursor.execute(sql_update, params_update)
 
@@ -347,7 +362,10 @@ class ProductDAO(BaseDAO):
             raise e
         finally:
             cursor.close()
-    # Toggle product status between Active and Inactive
+
+
+
+    # change product status between Active and Inactive
     def toggle_status(self, product_id):
         sql = """
             UPDATE Product 
@@ -355,32 +373,36 @@ class ProductDAO(BaseDAO):
                 Updated_At = NOW()
             WHERE Product_ID = %s
         """
+
         return self.executor.execute_update(sql, (product_id,))
 
-    ## Update product stock quantity and manage Status
+    ## Update product stock quantity
     def update_stock(self, product_id, amount, action):
+
         if action == 'increase':
             sql = """
                 UPDATE Product 
                 SET Stock = Stock + %s, 
-                    Status = CASE WHEN Status = 'OutOfStock' THEN 'Active' ELSE Status END,
-                    Updated_At = NOW() 
+                Status = CASE WHEN Status = 'OutOfStock' THEN 'Active' ELSE Status END,
+                Updated_At = NOW() 
                 WHERE Product_ID = %s
             """
+
         elif action == 'decrease':
             sql = """
                 UPDATE Product 
                 SET Stock = GREATEST(0, Stock - %s), 
-                    Status = CASE WHEN Stock - %s <= 0 AND Status = 'Active' THEN 'OutOfStock' ELSE Status END,
-                    Updated_At = NOW() 
+                Status = CASE WHEN Stock - %s <= 0 AND Status = 'Active' THEN 'OutOfStock' ELSE Status END,
+                Updated_At = NOW() 
                 WHERE Product_ID = %s
             """
             return self.executor.execute_update(sql, (amount, amount, product_id))
         else:
             return 0
+        
         return self.executor.execute_update(sql, (amount, product_id))
 
-    ## Fetch multiple product details in one query.
+    ## Fetch multiple product details in one query
     def get_products_by_ids(self, pids):
         
         if not pids:
@@ -389,11 +411,12 @@ class ProductDAO(BaseDAO):
         format_strings = ','.join(['%s'] * len(pids))
         sql = f"""
             SELECT p.Product_ID as id, p.Name as title, p.Price as price, 
-                   p.Image_URL as image, p.Vendor_ID as vendor_id, v.Store_Name as vendor_name
+            p.Image_URL as image, p.Vendor_ID as vendor_id, v.Store_Name as vendor_name
             FROM Product p
             JOIN Vendor v ON p.Vendor_ID = v.Vendor_ID
             WHERE p.Product_ID IN ({format_strings})
         """
+
         return self.executor.execute_query(sql, tuple(pids))
 
     # Get aggregate stats for a vendor in one query.
@@ -409,17 +432,24 @@ class ProductDAO(BaseDAO):
             FROM Product
             WHERE Vendor_ID = %s
         """
+
         return self.executor.execute_query_one(sql, (vendor_id,))
 
     def get_low_stock_products(self, vendor_id, limit=5):
+
         sql = "SELECT Product_ID as id, Name as name, Stock as stock FROM Product WHERE Vendor_ID = %s AND Stock > 0 AND Stock < 10 LIMIT %s"
+
         return self.executor.execute_query(sql, (vendor_id, limit))
 
     def check_product_ownership(self, product_id, vendor_id):
+
         sql = "SELECT Vendor_ID FROM Product WHERE Product_ID = %s"
         row = self.executor.execute_query_one(sql, (product_id,))
+
         return row and row['Vendor_ID'] == vendor_id
 
     def get_product_stock_status(self, product_id):
+
         sql = "SELECT Stock as stock, Status as status FROM Product WHERE Product_ID = %s"
+        
         return self.executor.execute_query_one(sql, (product_id,))

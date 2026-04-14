@@ -1,10 +1,10 @@
 from dao.BaseDAO import BaseDAO
 
-
 class TagDAO(BaseDAO):
     def __init__(self):
         super().__init__()
 
+    # get products by tag, show in main page when customer click tag
     def get_products_by_tags(self, tag_names, operator='OR', limit=20, offset=0):
         cleaned_tags = [tag.strip().lower() for tag in (tag_names or []) if tag and tag.strip()]
         if not cleaned_tags:
@@ -15,18 +15,18 @@ class TagDAO(BaseDAO):
         if operator.upper() == 'AND':
             sql = f"""
                 SELECT
-                    p.Product_ID AS id,
-                    p.Name AS name,
-                    COALESCE(p.Description, '') AS description,
-                    p.Price AS price,
-                    p.Stock AS stock,
-                    p.Category AS category,
-                    p.Image_URL AS image_url,
-                    p.Vendor_ID AS vendor_id,
-                    p.Status AS status,
-                    COALESCE(p.Rating, 0) AS rating,
-                    v.Store_Name AS store_name,
-                    COALESCE(GROUP_CONCAT(DISTINCT t_all.Name ORDER BY tg_all.Position SEPARATOR '||'), '') AS tag_names
+                p.Product_ID AS id,
+                p.Name AS name,
+                COALESCE(p.Description, '') AS description,
+                p.Price AS price,
+                p.Stock AS stock,
+                p.Category AS category,
+                p.Image_URL AS image_url,
+                p.Vendor_ID AS vendor_id,
+                p.Status AS status,
+                COALESCE(p.Rating, 0) AS rating,
+                v.Store_Name AS store_name,
+                COALESCE(GROUP_CONCAT(DISTINCT t_all.Name ORDER BY tg_all.Position SEPARATOR '||'), '') AS tag_names
                 FROM Product p
                 JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
                 JOIN Tagging tg_filter ON tg_filter.Product_ID = p.Product_ID
@@ -55,18 +55,18 @@ class TagDAO(BaseDAO):
             
             sql = f"""
                 SELECT
-                    p.Product_ID AS id,
-                    p.Name AS name,
-                    COALESCE(p.Description, '') AS description,
-                    p.Price AS price,
-                    p.Stock AS stock,
-                    p.Category AS category,
-                    p.Image_URL AS image_url,
-                    p.Vendor_ID AS vendor_id,
-                    p.Status AS status,
-                    COALESCE(p.Rating, 0) AS rating,
-                    v.Store_Name AS store_name,
-                    COALESCE(GROUP_CONCAT(DISTINCT t_all.Name ORDER BY tg_all.Position SEPARATOR '||'), '') AS tag_names
+                p.Product_ID AS id,
+                p.Name AS name,
+                COALESCE(p.Description, '') AS description,
+                p.Price AS price,
+                p.Stock AS stock,
+                p.Category AS category,
+                p.Image_URL AS image_url,
+                p.Vendor_ID AS vendor_id,
+                p.Status AS status,
+                COALESCE(p.Rating, 0) AS rating,
+                v.Store_Name AS store_name,
+                COALESCE(GROUP_CONCAT(DISTINCT t_all.Name ORDER BY tg_all.Position SEPARATOR '||'), '') AS tag_names
                 FROM Product p
                 JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
                 LEFT JOIN Tagging tg_filter ON tg_filter.Product_ID = p.Product_ID
@@ -128,6 +128,7 @@ class TagDAO(BaseDAO):
 
         return products
 
+    # count by tags 
     def count_products_by_tags(self, tag_names, operator='OR'):
         cleaned_tags = [tag.strip().lower() for tag in (tag_names or []) if tag and tag.strip()]
         if not cleaned_tags:
@@ -164,23 +165,24 @@ class TagDAO(BaseDAO):
                 JOIN Vendor v ON v.Vendor_ID = p.Vendor_ID
                 LEFT JOIN Tagging tg ON tg.Product_ID = p.Product_ID
                 LEFT JOIN Tag t ON t.Tag_ID = tg.Tag_ID
-                WHERE p.Status = 'Active'
-                  AND v.Status = 'Active'
-                  AND ({where_discovery})
+                WHERE p.Status = 'Active' AND v.Status = 'Active' AND ({where_discovery})
             """
+
             discovery_params = []
             for tag in cleaned_tags:
                 discovery_params.extend([tag, f"%{tag}%"])
             params = tuple(discovery_params)
 
         result = self.executor.execute_query_one(sql, params)
+
         return int(result["total"] or 0) if result else 0
 
     def get_popular_tags(self, limit=20):
+
         sql = """
             SELECT
-                t.Name AS name,
-                COUNT(DISTINCT tg.Product_ID) AS usage_count
+            t.Name AS name,
+            COUNT(DISTINCT tg.Product_ID) AS usage_count
             FROM Tag t
             JOIN Tagging tg ON tg.Tag_ID = t.Tag_ID
             JOIN Product p ON p.Product_ID = tg.Product_ID
@@ -190,7 +192,9 @@ class TagDAO(BaseDAO):
             ORDER BY usage_count DESC, t.Name ASC
             LIMIT %s
         """
+
         rows = self.executor.execute_query(sql, (limit,))
+
         return [
             {
                 "name": row["name"],
@@ -199,6 +203,7 @@ class TagDAO(BaseDAO):
             for row in rows
         ]
 
+    # get tags for a product
     def get_tags_by_product(self, product_id):
         sql = """
             SELECT t.Name
@@ -208,4 +213,5 @@ class TagDAO(BaseDAO):
             ORDER BY tg.Position
         """
         rows = self.executor.execute_query(sql, (product_id,))
+
         return [row["Name"] for row in rows]
