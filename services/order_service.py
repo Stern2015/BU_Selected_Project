@@ -5,6 +5,7 @@ Handles business logic related to orders and transactions
 from dao.OrderDAO import OrderDAO
 from typing import List, Dict, Optional, Union
 
+# order related logic ,mainly call on dao layer functions to complete tasks
 class OrderService:
     def __init__(self):
         self.order_dao = OrderDAO()

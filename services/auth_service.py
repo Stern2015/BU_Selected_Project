@@ -11,6 +11,7 @@ ROLE_CUSTOMER = 1
 ROLE_VENDOR = 2
 ROLE_ADMIN = 4
 
+# user class for user info retreive
 class User:
     def __init__(self, id, username, password, phone_number, role):
         self.id = id
@@ -38,7 +39,7 @@ class User:
         return {'id': self.id, 'username': self.username, 'password': self.password, 'role': self.role, "phone_number": self.phone_number}
 
 
-
+# auth service , for verification user password and role check
 class Auth_Service:
     def __init__(self):
         self.sql_executor = SQL_Executor()

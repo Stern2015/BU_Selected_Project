@@ -1,6 +1,8 @@
 from dao.ProductDAO import ProductDAO
 from dao.TagDAO import TagDAO
 
+# a service wrapper, mainly call on dao layer functions to complete task
+
 class ProductService:
     def __init__(self):
         self.product_dao = ProductDAO()

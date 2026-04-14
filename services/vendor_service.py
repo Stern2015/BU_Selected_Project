@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from driver.sql_executor import SQL_Executor
 
-
+# vendor service for admin management or vendor update istself
 class VendorService:
     def __init__(self):
         self.executor = SQL_Executor()
@@ -26,7 +26,7 @@ class VendorService:
 
             return []
 
-    # Generate vendor ID using user ID as base (following database convention)
+    # Generate vendor ID using user ID as base
     def onboard_new_vendor(self, user_id, business_name, geographical_presence):
         try:
             
@@ -65,6 +65,7 @@ class VendorService:
 
             return {'success': False, 'vendor_id': None, 'message': f'Error: {str(e)}'}
 
+    # query vendor
     def get_vendor_by_id(self, vendor_id):
         try:
             sql = """
@@ -94,6 +95,7 @@ class VendorService:
 
             return None
 
+    # vendor update its info, like name or position
     def update_vendor_info(self, vendor_id, business_name=None, geographical_presence=None):
 
         try:
@@ -139,6 +141,7 @@ class VendorService:
             print(f"Error updating vendor {vendor_id}: {str(e)}")
             return {'success': False, 'message': f'Error: {str(e)}'}
 
+    # get vendor's product list for show
     def get_vendor_products(self, vendor_id):
 
         try:
@@ -165,6 +168,7 @@ class VendorService:
             print(f"Error retrieving products for vendor {vendor_id}: {str(e)}")
             return []
 
+    # get avg rating info from vendor table for show use
     def get_vendor_average_rating(self, vendor_id):
 
         try:
@@ -196,6 +200,7 @@ class VendorService:
             print(f"Error calculating average rating for vendor {vendor_id}: {str(e)}")
             return 0.00
 
+    # get vendor's order list, aka transactions
     def get_vendor_orders(self, vendor_id):
         try:
             # Verify vendor exists
@@ -227,8 +232,7 @@ class VendorService:
             print(f"Note: Could not retrieve vendor orders (Order tables may not exist): {str(e)}")
             return []
 
-    # Additional utility methods
-    
+    # get vendor stats info 
     def get_vendor_stats(self, vendor_id):
         try:
             vendor = self.get_vendor_by_id(vendor_id)
@@ -259,6 +263,7 @@ class VendorService:
             print(f"Error retrieving vendor stats: {str(e)}")
             return None
 
+    # update vendor's avrg rating, aggregate from customers's ratings
     def update_vendor_rating(self, vendor_id, new_rating):
         try:
             # Validate rating range
@@ -291,6 +296,7 @@ class VendorService:
             print(f"Error updating vendor rating: {str(e)}")
             return {'success': False, 'message': f'Error: {str(e)}'}
 
+    # off board vendor
     def deactivate_vendor(self, vendor_id):
         try:
             # Check if vendor exists
@@ -320,6 +326,7 @@ class VendorService:
             print(f"Error deactivating vendor: {str(e)}")
             return {'success': False, 'message': f'Error: {str(e)}'}
 
+    # re- onborad vendor
     def activate_vendor(self, vendor_id):
 
         try:
