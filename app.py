@@ -4,6 +4,7 @@ from driver.sql_executor import SQL_Executor
 from dao.ProductDAO import ProductDAO
 from dao.TagDAO import TagDAO
 from dao.UserDAO import UserDAO
+from dao.CustomerDAO import CustomerDAO
 from services.vendor_service import VendorService
 from services.order_service import OrderService
 from services.auth_service import Auth_Service
@@ -14,6 +15,7 @@ app.secret_key = 'super_secret_key_for_bu_selected'
 product_dao = ProductDAO()
 tag_dao = TagDAO()
 user_dao = UserDAO()
+customer_dao = CustomerDAO()
 vendor_service = VendorService()
 order_service = OrderService()
 sql_executor = SQL_Executor()
@@ -397,6 +399,32 @@ def remove_order_item(oid, item_id):
         flash('Cannot remove item. Order might already be shipped or item not found.')
         
     return redirect(url_for('order_detail', oid=oid))
+
+@app.route('/vendor/<vid>/rate', methods=['POST'])
+def rate_vendor(vid):
+    if 'user' not in session or session.get('login_type') != 'customer' or not has_role(session['user'], ROLE_CUSTOMER):
+        return redirect(url_for('login', type='customer'))
+    
+    uid = session['user']['id']
+    try:
+        score = int(request.form.get('score', 0))
+    except ValueError:
+        score = 0
+        
+    if score < 1 or score > 5:
+        flash("Score must be between 1 and 5.")
+        return redirect(request.referrer or url_for('index'))
+        
+    success = customer_dao.set_rating(uid, vid, score)
+    if success:
+        # Sync the newly calculated average rating to the Vendor table
+        new_avg = vendor_service.get_vendor_average_rating(vid)
+        vendor_service.update_vendor_rating(vid, new_avg)
+        flash("Rating submitted successfully!")
+    else:
+        flash("Failed to submit rating.")
+        
+    return redirect(request.referrer or url_for('index'))
 
 # --- VENDOR ROUTES ---
 

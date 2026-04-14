@@ -201,26 +201,26 @@ class VendorService:
     def get_vendor_average_rating(self, vendor_id):
         """
         Calculate/retrieve average rating for a vendor
-        Computes average rating from all vendor's products
-        
+        Computes average rating from customer ratings
+
         Args:
             vendor_id (str): The vendor ID
-        
+
         Returns:
-            float: Average rating (0.00 - 5.00), or 0.00 if no products or vendor not found
+            float: Average rating (0.00 - 5.00), or 0.00 if no ratings or vendor not found
         """
         try:
-            # Get average rating from vendor's products
+            # Get average rating from customer's Rating table
             sql = """
-                SELECT AVG(COALESCE(Rating, 0)) as avg_rating
-                FROM Product
-                WHERE Vendor_ID = %s AND Status IN ('Active', 'OutOfStock')
+                SELECT AVG(Score) as avg_rating
+                FROM Rating
+                WHERE Vendor_ID = %s
             """
             
             result = self.executor.execute_query_one(sql, (vendor_id,))
             
-            if result and result[0] is not None:
-                avg_rating = float(result[0])
+            if result and result.get('avg_rating') is not None:
+                avg_rating = float(result['avg_rating'])
                 # Round to 2 decimal places
                 return round(avg_rating, 2)
             
@@ -228,8 +228,8 @@ class VendorService:
             vendor_sql = "SELECT Rating FROM Vendor WHERE Vendor_ID = %s"
             vendor_result = self.executor.execute_query_one(vendor_sql, (vendor_id,))
             
-            if vendor_result:
-                return float(vendor_result[0])
+            if vendor_result and vendor_result.get('Rating') is not None:
+                return float(vendor_result['Rating'])
             
             return 0.00
             
@@ -299,25 +299,24 @@ class VendorService:
                 return None
             
             # Count products
-            product_count_sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s"
+            product_count_sql = "SELECT COUNT(*) as cnt FROM Product WHERE Vendor_ID = %s"
             product_count = self.executor.execute_query_one(product_count_sql, (vendor_id,))
-            
+
             # Get average rating
             avg_rating = self.get_vendor_average_rating(vendor_id)
-            
+
             # Count active products
-            active_count_sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s AND Status = 'Active'"
+            active_count_sql = "SELECT COUNT(*) as cnt FROM Product WHERE Vendor_ID = %s AND Status = 'Active'"
             active_count = self.executor.execute_query_one(active_count_sql, (vendor_id,))
-            
+
             return {
                 'vendor_id': vendor_id,
                 'business_name': vendor['business_name'],
-                'total_products': product_count[0] if product_count else 0,
-                'active_products': active_count[0] if active_count else 0,
+                'total_products': product_count['cnt'] if product_count else 0,
+                'active_products': active_count['cnt'] if active_count else 0,
                 'average_rating': avg_rating,
                 'status': vendor['status']
-            }
-            
+            }            
         except Exception as e:
             print(f"Error retrieving vendor stats: {str(e)}")
             return None
