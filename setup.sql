@@ -79,11 +79,11 @@ INSERT INTO Customer VALUES
 
 -- Rating table (customer rates vendor)
 CREATE TABLE Rating (
+    ID INT AUTO_INCREMENT PRIMARY KEY,
     Customer_ID VARCHAR(50),
     Vendor_ID VARCHAR(50),
     Score INT,
-    Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (Customer_ID, Vendor_ID)
+    Created_At TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Category table (product categories)

@@ -170,17 +170,18 @@ class CustomerDAO(BaseDAO):
 
     # Rating
     def get_rating(self, customer_id, vendor_id):
-        sql = "SELECT * FROM Rating WHERE Customer_ID = %s AND Vendor_ID = %s"
+        """Get the latest rating from this customer for this vendor"""
+        sql = "SELECT * FROM Rating WHERE Customer_ID = %s AND Vendor_ID = %s ORDER BY Created_At DESC"
         params = (customer_id, vendor_id)
         return self.executor.execute_query_one(sql, params)
 
     def set_rating(self, customer_id, vendor_id, score):
+        """Insert a new rating (supports multiple ratings per pair)"""
         sql = """
-            INSERT INTO Rating (Customer_ID, Vendor_ID, Score)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE Score = %s
+            INSERT INTO Rating (Customer_ID, Vendor_ID, Score, Created_At)
+            VALUES (%s, %s, %s, NOW())
         """
-        params = (customer_id, vendor_id, score, score)
+        params = (customer_id, vendor_id, score)
         return self.executor.execute_update(sql, params)
 
     def get_rating_from_customer(self, customer_id):
