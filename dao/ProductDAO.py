@@ -40,24 +40,22 @@ class ProductDAO(BaseDAO):
                 # Matches Name OR associated tags
                 term_clauses.append(f"""
                     (p.Name LIKE %s OR EXISTS (
-                        SELECT 1 FROM Tagging tg_s
-                        JOIN Tag t_s ON t_s.Tag_ID = tg_s.Tag_ID
-                        WHERE tg_s.Product_ID = p.Product_ID
-                          AND (t_s.Name LIKE %s OR LOWER(t_s.Name) = LOWER(%s))
+                        SELECT 1 FROM Tagging tg_s JOIN Tag t_s ON t_s.Tag_ID = tg_s.Tag_ID
+                        WHERE tg_s.Product_ID = p.Product_ID AND (t_s.Name LIKE %s OR LOWER(t_s.Name) = LOWER(%s))
                     ))
                 """)
                 params.extend([like_pattern, like_pattern, term])
             
-            # Combine multiple terms with OR for broader discovery
+            # Combine multiple terms
             clauses.append("(" + " OR ".join(term_clauses) + ")")
 
         return " AND ".join(clauses), params
 
-    # return formated product infos
+    # format product infos
     def _format_product_card(self, row):
         tag_names = row["tag_names"].split("||") if row["tag_names"] else []
-        stock = int(row["stock"] or 0)
-        rating = float(row["rating"] or 0)
+        stock = int(row["stock"])
+        rating = float(row["rating"])
 
         if stock == 0 or row["status"] == "OutOfStock":
             status_class = "bg-yellow-100 text-yellow-800"
@@ -102,10 +100,7 @@ class ProductDAO(BaseDAO):
         )
 
         sql = f"""
-            SELECT
-            p.Product_ID AS id,
-            p.Name AS name,
-            COALESCE(p.Description, '') AS description,
+            SELECT p.Product_ID AS id, p.Name AS name, COALESCE(p.Description, '') AS description,
             p.Price AS price,
             p.Stock AS stock,
             p.Category AS category,
@@ -120,13 +115,12 @@ class ProductDAO(BaseDAO):
             LEFT JOIN Tagging tg ON tg.Product_ID = p.Product_ID
             LEFT JOIN Tag t ON t.Tag_ID = tg.Tag_ID
             WHERE {where_condition}
-            GROUP BY
-                p.Product_ID, p.Name, p.Description, p.Price, p.Stock,
-                p.Category, p.Image_URL, p.Vendor_ID, p.Status, p.Rating, v.Store_Name
+            GROUP BY p.Product_ID, p.Name, p.Description, p.Price, p.Stock, p.Category, p.Image_URL, p.Vendor_ID, p.Status, p.Rating, v.Store_Name
             ORDER BY p.Created_At DESC
             LIMIT %s OFFSET %s
         """
         rows = self.executor.execute_query(sql, tuple(params + [limit, offset]))
+
         return [self._format_product_card(row) for row in rows]
 
     def count_public_products(self, keyword=None, category=None, min_price=None, max_price=None, tags=None):
@@ -209,7 +203,7 @@ class ProductDAO(BaseDAO):
 
         return result["Store_Name"] if result else "Unknown"
 
-    ## List products for a specific vendor with status filtering.
+    ##list products for a specific vendor with status filtering.
     def list_vendor_products(self, vendor_id, tab='all', limit=20, offset=0):
 
         clauses = ["p.Vendor_ID = %s"]
@@ -224,9 +218,7 @@ class ProductDAO(BaseDAO):
 
         where_sql = " AND ".join(clauses)
         sql = f"""
-            SELECT
-            p.Product_ID AS id,
-            p.Name AS name,
+            SELECT p.Product_ID AS id, p.Name AS name,
             COALESCE(p.Description, '') AS description,
             p.Price AS price,
             p.Stock AS stock,
@@ -253,7 +245,7 @@ class ProductDAO(BaseDAO):
 
         return [self._format_product_card(row) for row in rows]
     
-    ## Count products
+    ##count products
     def count_vendor_products(self, vendor_id, tab='all'):
         
         clauses = ["Vendor_ID = %s"]
@@ -272,39 +264,43 @@ class ProductDAO(BaseDAO):
 
         return int(result["total"] or 0) if result else 0
 
-    # Add a new product with tags using a robust transaction.
+    #add a new product with tags using transaction.
     def add_product(self, product_id, name, description, price, stock, category, image_url, vendor_id, tags_text):
         operations = []
         
-        # 1. Add product insert operation
+        # 1.add product operation, insert to Product table
         sql_product = """
             INSERT INTO Product (Product_ID, Name, Description, Price, Stock, Category, Image_URL, Vendor_ID, Status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Active')
         """
         params_product = (product_id, name, description, price, stock, category, image_url, vendor_id)
         
-        # We'll use a manual transaction approach to handle the dynamic Tag IDs
+        #use a manual transaction approach to handle the dynamic Tag IDs
         conn = self.executor.conn_manager.get_connection()
         cursor = conn.cursor()
         try:
             conn.ping(reconnect=True)
             conn.autocommit(False)
             
-            # Insert product
+            #insert product
             cursor.execute(sql_product, params_product)
             
-            # Process tags
+            #process tags
             if tags_text:
+                #get at most 3 tags
                 tag_list = [t.strip() for t in tags_text.split(',') if t.strip()][:3]
+
                 for i, tag_name in enumerate(tag_list):
-                    # Ensure tag exists
+                    #make sure tag exists
                     cursor.execute("INSERT IGNORE INTO Tag (Name) VALUES (%s)", (tag_name,))
-                    # Get ID
+
+                    #get ID
                     cursor.execute("SELECT Tag_ID FROM Tag WHERE Name = %s", (tag_name,))
+
                     row = cursor.fetchone()
                     if row:
                         tag_id = row['Tag_ID']
-                        # Link tag to product
+                        #link tag to product
                         cursor.execute(
                             "INSERT INTO Tagging (Product_ID, Tag_ID, Position) VALUES (%s, %s, %s)",
                             (product_id, tag_id, i + 1)
@@ -319,7 +315,7 @@ class ProductDAO(BaseDAO):
         finally:
             cursor.close()
 
-    # Update existing product details and tags in a transaction
+    #update existing product details and tags in a transaction
     def update_product(self, product_id, name, description, price, stock, category, image_url, tags_text, status):
 
         conn = self.executor.conn_manager.get_connection()
@@ -423,14 +419,11 @@ class ProductDAO(BaseDAO):
     def get_vendor_stats(self, vendor_id):
         
         sql = """
-            SELECT 
-                COUNT(*) as total_products,
-                SUM(CASE WHEN Status = 'Active' THEN 1 ELSE 0 END) as active_products,
-                SUM(Stock) as total_stock,
-                SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
-                SUM(CASE WHEN Status = 'Inactive' THEN 1 ELSE 0 END) as inactive_products
-            FROM Product
-            WHERE Vendor_ID = %s
+            SELECT COUNT(*) as total_products, SUM(CASE WHEN Status = 'Active' THEN 1 ELSE 0 END) as active_products,
+            SUM(Stock) as total_stock,
+            SUM(CASE WHEN Stock = 0 THEN 1 ELSE 0 END) as out_of_stock,
+            SUM(CASE WHEN Status = 'Inactive' THEN 1 ELSE 0 END) as inactive_products
+            FROM Product WHERE Vendor_ID = %s
         """
 
         return self.executor.execute_query_one(sql, (vendor_id,))

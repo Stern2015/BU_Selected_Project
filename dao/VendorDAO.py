@@ -74,8 +74,8 @@ class VendorDAO(BaseDAO):
         try:
             sql = """SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
                 FROM Vendor WHERE Location LIKE %s ORDER BY Created_At DESC"""
-            
             results = self.executor.execute_query(sql, (f"%{locat}%",))
+
             return [self._map_row_to_dict(row) for row in results] if results else []
         
         except Exception as e:
@@ -86,8 +86,8 @@ class VendorDAO(BaseDAO):
     def count_all(self):
         try:
             sql = "SELECT COUNT(*) FROM Vendor"
-
             result = self.executor.execute_query_one(sql)
+
             return result[0] if result else 0
         except Exception as e:
 
@@ -98,15 +98,17 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT COUNT(*) FROM Vendor WHERE Status = %s"
             result = self.executor.execute_query_one(sql, (status,))
+
             return result[0] if result else 0
         except Exception as e:
 
             print(f"Error counting vendors by status: {str(e)}")
             return 0
     
-    # update vendor info 
+    #update vendor info 
     def update(self, vendor_id, **fields):
         try:
+            #if no fields pass through no need to update
             if not fields:
                 return False
             
@@ -125,6 +127,7 @@ class VendorDAO(BaseDAO):
                     update_parts.append(f"{field_mapping[field]} = %s")
                     values.append(value)
             if not update_parts:
+
                 return False
             
             update_parts.append("Updated_At = NOW()")
@@ -133,22 +136,24 @@ class VendorDAO(BaseDAO):
             # write sql statement and exec
             sql = f"UPDATE Vendor SET {', '.join(update_parts)} WHERE Vendor_ID = %s"
             affected = self.executor.execute_update(sql, tuple(values))
+
             return affected > 0
         except Exception as e:
 
             print(f"Error updat vendor: {str(e)}")
             return False
     
-    # update ratings for vendor id
+    #update ratings for vendor
     def update_rating(self, vendor_id, new_rating):
         try:
-            # Validate rating range
+            #check rating range valid or not
             if new_rating < 0.00 or new_rating > 5.00:
                 raise ValueError("Rating must be between 0.00 and 5.00")
             
-            # 
+            #pdate corresponding vendor avg rating to new rating
             sql = "UPDATE Vendor SET Rating = %s, Updated_At = NOW() WHERE Vendor_ID = %s"
             affected = self.executor.execute_update(sql, (new_rating, vendor_id))
+
             return affected > 0
         except Exception as e:
 
@@ -158,11 +163,13 @@ class VendorDAO(BaseDAO):
     # update vendor status on/off board
     def update_status(self, vendor_id, status):
         try:
+            # check param
             if status not in ['Active', 'Inactive']:
                 raise ValueError("Status must be 'Active' or 'Inactive'")
             
             sql = "UPDATE Vendor SET Status = %s, Updated_At = NOW() WHERE Vendor_ID = %s"
             affected = self.executor.execute_update(sql, (status, vendor_id))
+
             return affected > 0
         except Exception as e:
 
@@ -186,6 +193,7 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s"
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result[0] if result else 0
         except Exception as e:
 
@@ -197,6 +205,7 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s AND Status = 'Active'"
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result[0] if result else 0
         except Exception as e:
 
@@ -208,6 +217,7 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT COUNT(*) FROM Product WHERE Vendor_ID = %s AND Stock = 0"
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result[0] if result else 0
         except Exception as e:
 
@@ -219,6 +229,7 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT COALESCE(SUM(Stock), 0) FROM Product WHERE Vendor_ID = %s"
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result[0] if result else 0
         except Exception as e:
 
@@ -233,6 +244,7 @@ class VendorDAO(BaseDAO):
                 WHERE p.Vendor_ID = %s
             """
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result[0] if result else 0
         
         except Exception as e:
@@ -245,6 +257,7 @@ class VendorDAO(BaseDAO):
         try:
             sql = "SELECT 1 FROM Vendor WHERE Vendor_ID = %s LIMIT 1"
             result = self.executor.execute_query_one(sql, (vendor_id,))
+
             return result is not None
         
         except Exception as e:
@@ -268,7 +281,6 @@ class VendorDAO(BaseDAO):
         except Exception as e:
 
             print(f"Error getting vendor stats: {str(e)}")
-
             return None
     
     def activate_all_in_location(self, location):
@@ -278,12 +290,11 @@ class VendorDAO(BaseDAO):
                 WHERE Location LIKE %s AND Status = 'Inactive'
             """
             affected = self.executor.execute_update(sql, (f"%{location}%",))
+
             return affected
-        
         except Exception as e:
 
             print(f"Error activating vendors: {str(e)}")
-
             return 0
     
     def deactivate_all_in_location(self, location):
@@ -293,6 +304,7 @@ class VendorDAO(BaseDAO):
                 WHERE Location LIKE %s AND Status = 'Active'
             """
             affected = self.executor.execute_update(sql, (f"%{location}%",))
+            
             return affected
         
         except Exception as e:

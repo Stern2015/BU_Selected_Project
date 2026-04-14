@@ -1,6 +1,5 @@
 """
-DB Connection Management
-Handles database connection pool and connection acquisition
+DB Connection
 """
 
 import pymysql
@@ -30,12 +29,17 @@ class Connection_Manager:
 
         return cm._instance_
     
+    #get a connection, persistent conn for optimization
     def get_connection(self):
+        #when conn is unlinked
         if self._conn is None:
             self._conn = pymysql.connect(**self.config)
+        #else check conn idle or reconnect,
         else:
             try:
                 self._conn.ping(reconnect=True)
             except:
                 self._conn = pymysql.connect(**self.config)
+
+        #return an available conn
         return self._conn

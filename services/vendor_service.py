@@ -1,8 +1,6 @@
 """
 Vendor Management Service
 """
-import uuid
-from datetime import datetime
 from driver.sql_executor import SQL_Executor
 
 # vendor service for admin management or vendor update istself
@@ -11,42 +9,34 @@ class VendorService:
         self.executor = SQL_Executor()
 
     def get_all_vendors(self):
-        sql = """
-            SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-            FROM Vendor
-            ORDER BY Created_At DESC
-        """
+        sql = """SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At FROM Vendor ORDER BY Created_At DESC"""
         try:
             results = self.executor.execute_query(sql)
             return results if results else []
         
         except Exception as e:
 
-            print(f"Error retrieving all vendors: {str(e)}")
-
+            print(f"Error getting all vendors: {str(e)}")
             return []
 
-    # Generate vendor ID using user ID as base
+    #onboard a new vendor from an existing useraccount
     def onboard_new_vendor(self, user_id, business_name, geographical_presence):
         try:
-            
+            #vendor ID using user ID
             vendor_id = user_id
             
-            # Check if vendor already exists
+            #check if vendor already exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             existing = self.executor.execute_query_one(check_sql, (vendor_id,))
             
             if existing:
                 return {'success': False, 'vendor_id': None, 'message': 'Vendor already exists for this user'}
             
-            # Insert new vendor
-            insert_sql = """
-                INSERT INTO Vendor (Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At)
-                VALUES (%s, %s, %s, 'Active', 0.00, NOW(), NOW())
-            """
+            #insert new vendor
+            insert_sql = """INSERT INTO Vendor (Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At)
+                VALUES (%s, %s, %s, 'Active', 0.00, NOW(), NOW())"""
             
             affected = self.executor.execute_update(insert_sql, (vendor_id, business_name, geographical_presence))
-            
             if affected > 0:
 
                 return {
@@ -61,22 +51,18 @@ class VendorService:
                 
         except Exception as e:
 
-            print(f"Error onboarding vendor: {str(e)}")
-
+            print(f"Error onboarding vendor, error: {str(e)}")
             return {'success': False, 'vendor_id': None, 'message': f'Error: {str(e)}'}
 
-    # query vendor
+    # query vendor by id
     def get_vendor_by_id(self, vendor_id):
         try:
-            sql = """
-                SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
-                FROM Vendor
-                WHERE Vendor_ID = %s
-            """
-
-            result = self.executor.execute_query_one(sql, (vendor_id,))
+            sql = """SELECT Vendor_ID, Store_Name, Location, Status, Rating, Created_At, Updated_At
+                FROM Vendor WHERE Vendor_ID = %s"""
+            result = self.executor.execute_query_one(sql, (vendor_id,)) # return one record
             
             if result:
+                #dicted the result
                 return {
                     'vendor_id': result['Vendor_ID'],
                     'business_name': result['Store_Name'],
@@ -91,22 +77,21 @@ class VendorService:
             
         except Exception as e:
 
-            print(f"Error retrieving vendor {vendor_id}: {str(e)}")
-
+            print(f"Error getting vendor info: {vendor_id}: {str(e)}")
             return None
 
-    # vendor update its info, like name or position
+    #vendor update its info, like name or position
     def update_vendor_info(self, vendor_id, business_name=None, geographical_presence=None):
 
         try:
-            # Check if vendor exists
+            #check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             existing = self.executor.execute_query_one(check_sql, (vendor_id,))
             
             if not existing:
                 return {'success': False, 'message': 'Vendor not found'}
             
-            # Build update query dynamically
+            #build update query dynamically
             update_parts = ['Updated_At = NOW()']
             params = []
             
@@ -118,15 +103,13 @@ class VendorService:
                 update_parts.append('Location = %s')
                 params.append(geographical_presence)
             
-            # If no updates besides timestamp, return success
-
+            #if only time part is appended, means not real info is updated
             if len(update_parts) == 1:
-                return {'success': True, 'message': 'No changes to update'}
+                return {'success': True, 'message': 'No changes to update'} #if updated, return success info to UI show
             
             params.append(vendor_id)
 
             update_sql = f"UPDATE Vendor SET {', '.join(update_parts)} WHERE Vendor_ID = %s"
-            
             affected = self.executor.execute_update(update_sql, tuple(params))
             
             if affected > 0:
@@ -141,52 +124,43 @@ class VendorService:
             print(f"Error updating vendor {vendor_id}: {str(e)}")
             return {'success': False, 'message': f'Error: {str(e)}'}
 
-    # get vendor's product list for show
+    #get vendor's product list for show
     def get_vendor_products(self, vendor_id):
-
         try:
-            # First verify vendor exists
+            #check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             vendor_exists = self.executor.execute_query_one(check_sql, (vendor_id,))
             
+            #if not exist return empty list, not None
             if not vendor_exists:
                 return []
             
-            # Get all products for this vendor
-            sql = """
-                SELECT Product_ID, Name, Description, Price, Stock, Category, Image_URL, Status, Rating, Created_At, Updated_At
-                FROM Product WHERE Vendor_ID = %s
-                ORDER BY Created_At DESC
-            """
-            
+            #get all products of this vendor
+            sql = """SELECT Product_ID, Name, Description, Price, Stock, Category, Image_URL, Status, Rating, Created_At, Updated_At
+                FROM Product WHERE Vendor_ID = %s ORDER BY Created_At DESC"""
+            #get records list
             results = self.executor.execute_query(sql, (vendor_id,))
 
+            #if results None means not products for this vendor then return empty list
             return results if results else []
             
         except Exception as e:
-
-            print(f"Error retrieving products for vendor {vendor_id}: {str(e)}")
+            print(f"Error getting products for vendor {vendor_id}: {str(e)}")
             return []
 
-    # get avg rating info from vendor table for show use
+    #get avg rating info from vendor table for show use
     def get_vendor_average_rating(self, vendor_id):
-
         try:
-            # Get average rating from customer's Rating table
-            sql = """
-                SELECT AVG(Score) as avg_rating
-                FROM Rating
-                WHERE Vendor_ID = %s
-            """
-            
+            #get average rating from customer's Rating table
+            sql = """SELECT AVG(Score) as avg_rating FROM Rating WHERE Vendor_ID = %s"""
             result = self.executor.execute_query_one(sql, (vendor_id,))
             
             if result and result.get('avg_rating') is not None:
                 avg_rating = float(result['avg_rating'])
-                # Round to 2 decimal places
+                #round to 2 decimal places
                 return round(avg_rating, 2)
             
-            # Also check the Rating field in Vendor table as fallback
+            #check the Rating field in Vendor table
             vendor_sql = "SELECT Rating FROM Vendor WHERE Vendor_ID = %s"
             vendor_result = self.executor.execute_query_one(vendor_sql, (vendor_id,))
             
@@ -194,59 +168,50 @@ class VendorService:
                 return float(vendor_result['Rating'])
             
             return 0.00
-            
         except Exception as e:
 
-            print(f"Error calculating average rating for vendor {vendor_id}: {str(e)}")
+            print(f"Error computing average rating for vendor {vendor_id}: {str(e)}")
             return 0.00
 
-    # get vendor's order list, aka transactions
+    #get vendor's order list, aka transactions
     def get_vendor_orders(self, vendor_id):
         try:
-            # Verify vendor exists
+            #check if the vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             vendor_exists = self.executor.execute_query_one(check_sql, (vendor_id,))
             
             if not vendor_exists:
                 return []
             
-            # Try to fetch orders related to this vendor's products
-            # This assumes Order and OrderItem tables exist with proper foreign keys
-            sql = """
-                SELECT DISTINCT oi.Order_ID, oi.Product_ID, oi.Quantity, oi.Price, 
-                       o.Order_Date, o.Status, o.Customer_ID, p.Name as Product_Name
-                FROM Order o
-                JOIN OrderItem oi ON o.Order_ID = oi.Order_ID
-                JOIN Product p ON oi.Product_ID = p.Product_ID
-                WHERE p.Vendor_ID = %s
-                ORDER BY o.Order_Date DESC
-            """
-            
+            #get orders related to current vendor
+            sql = """SELECT DISTINCT oi.Order_ID, oi.Product_ID, oi.Quantity, oi.Price, o.Order_Date, o.Status, o.Customer_ID, p.Name as Product_Name
+                FROM Order o JOIN OrderItem oi ON o.Order_ID = oi.Order_ID JOIN Product p ON oi.Product_ID = p.Product_ID WHERE p.Vendor_ID = %s ORDER BY o.Order_Date DESC"""
             results = self.executor.execute_query(sql, (vendor_id,))
 
+            #if results None means not products for this vendor then return empty list
             return results if results else []
             
         except Exception as e:
 
-            # If Order/OrderItem tables don't exist, return empty list gracefully
-            print(f"Note: Could not retrieve vendor orders (Order tables may not exist): {str(e)}")
+            #if Order/OrderItem tables don't exist, return empty list and report messgae
+            print(f"Could not retrieve vendor orders: {str(e)}")
             return []
 
-    # get vendor stats info 
+    #get vendor stats info 
     def get_vendor_stats(self, vendor_id):
         try:
             vendor = self.get_vendor_by_id(vendor_id)
             if not vendor:
                 return None
             
-            # Count products
+            #count products
             product_count_sql = "SELECT COUNT(*) as cnt FROM Product WHERE Vendor_ID = %s"
             product_count = self.executor.execute_query_one(product_count_sql, (vendor_id,))
 
-            # Get average rating
+            #get average rating
             avg_rating = self.get_vendor_average_rating(vendor_id)
 
-            # Count active products
+            #count active products
             active_count_sql = "SELECT COUNT(*) as cnt FROM Product WHERE Vendor_ID = %s AND Status = 'Active'"
             active_count = self.executor.execute_query_one(active_count_sql, (vendor_id,))
 
@@ -260,29 +225,25 @@ class VendorService:
             }            
         except Exception as e:
 
-            print(f"Error retrieving vendor stats: {str(e)}")
+            print(f"Error get vendor stats: {str(e)}")
             return None
 
-    # update vendor's avrg rating, aggregate from customers's ratings
+    #update vendor's avrg rating, aggregate from customers's ratings
     def update_vendor_rating(self, vendor_id, new_rating):
         try:
-            # Validate rating range
+            #validate rating range
             if new_rating < 0.00 or new_rating > 5.00:
                 return {'success': False, 'message': 'Rating must be between 0.00 and 5.00'}
             
-            # Check if vendor exists
+            #check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             existing = self.executor.execute_query_one(check_sql, (vendor_id,))
             
             if not existing:
                 return {'success': False, 'message': 'Vendor not found'}
             
-            # Update rating
-            update_sql = """
-                UPDATE Vendor 
-                SET Rating = %s, Updated_At = NOW()
-                WHERE Vendor_ID = %s
-            """
+            #update rating
+            update_sql = """UPDATE Vendor SET Rating = %s, Updated_At = NOW() WHERE Vendor_ID = %s"""
             
             affected = self.executor.execute_update(update_sql, (new_rating, vendor_id))
             
@@ -296,10 +257,10 @@ class VendorService:
             print(f"Error updating vendor rating: {str(e)}")
             return {'success': False, 'message': f'Error: {str(e)}'}
 
-    # off board vendor
+    #off-board vendor
     def deactivate_vendor(self, vendor_id):
         try:
-            # Check if vendor exists
+            #check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             existing = self.executor.execute_query_one(check_sql, (vendor_id,))
             
@@ -307,12 +268,8 @@ class VendorService:
 
                 return {'success': False, 'message': 'Vendor not found'}
             
-            # Update vendor status to Inactive
-            update_sql = """
-                UPDATE Vendor 
-                SET Status = 'Inactive', Updated_At = NOW()
-                WHERE Vendor_ID = %s
-            """
+            #update vendor status to Inactive
+            update_sql = """UPDATE Vendor SET Status = 'Inactive', Updated_At = NOW() WHERE Vendor_ID = %s"""
             
             affected = self.executor.execute_update(update_sql, (vendor_id,))
             
@@ -330,27 +287,21 @@ class VendorService:
     def activate_vendor(self, vendor_id):
 
         try:
-            # Check if vendor exists
+            #check if vendor exists
             check_sql = "SELECT Vendor_ID FROM Vendor WHERE Vendor_ID = %s"
             existing = self.executor.execute_query_one(check_sql, (vendor_id,))
             
             if not existing:
                 return {'success': False, 'message': 'Vendor not found'}
             
-            # Update vendor status to Active
-            update_sql = """
-                UPDATE Vendor 
-                SET Status = 'Active', Updated_At = NOW()
-                WHERE Vendor_ID = %s
-            """
+            #update vendor status to Active
+            update_sql = """UPDATE Vendor SET Status = 'Active', Updated_At = NOW() WHERE Vendor_ID = %s"""
             
             affected = self.executor.execute_update(update_sql, (vendor_id,))
             
             if affected > 0:
-
                 return {'success': True, 'message': 'Vendor activated successfully'}
             else:
-
                 return {'success': False, 'message': 'Failed to activate vendor'}
                 
         except Exception as e:

@@ -4,7 +4,6 @@ Auth Service, Handles business logic related to authentication
 
 from driver.sql_executor import SQL_Executor
 from dao.UserDAO import UserDAO
-import hashlib
 
 # Role Bitmasks
 ROLE_CUSTOMER = 1
@@ -39,31 +38,31 @@ class User:
         return {'id': self.id, 'username': self.username, 'password': self.password, 'role': self.role, "phone_number": self.phone_number}
 
 
-# auth service , for verification user password and role check
+#auth service , for verification user password and role check
 class Auth_Service:
     def __init__(self):
         self.sql_executor = SQL_Executor()
 
     def verify_user_account(self, username, password):
-        password_hash = password  ## direct use raw password
+        ##direct use raw password for easy insert sample data
+        #if in production scenario, should hash password for security
+        password_hash = password  
         userdao = UserDAO()
+
         result = userdao.get_user_by_username(username)
         if result:
             if result['PasswordHash'] == password_hash:
+
                 return True
         return False
     
+    #to get user account info for other user,return User instances
     def get_user_info(self, username):
         userdao = UserDAO()
         result = userdao.get_user_by_username(username)
         if result:
-            user = User(
-                result['User_ID'], 
-                result['Username'], 
-                result['PasswordHash'], 
-                result['Phone_Number'], 
-                result['Role_Bits']
-            )
+            user = User(result['User_ID'], result['Username'], result['PasswordHash'], result['Phone_Number'], result['Role_Bits'])
+            
             return user
         
         return None
